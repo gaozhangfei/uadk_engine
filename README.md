@@ -7,6 +7,8 @@ OpenSSL engine for uadk
 	- [Build & Install UADK](#build-&-install-uadk)
 	- [Build & Install OpenSSL UADK engine](#build-&-install-openssl-uadk-engine)
 	- [Testing](#testing)
+- [Install libraries to the temp folder](#Install-libraries-to-the-temp-folder)
+- [Environment variable of uadk engin](#Environment-variable-of-uadk-engine)
 
 Prerequisites
 =============
@@ -17,8 +19,6 @@ Prerequisites
 
 Installation Instruction
 ========================
-
-#. Install all libraries to system folder /usr/local/lib
 
 Build & Install OpenSSL
 -----------------------
@@ -68,10 +68,11 @@ Testing
     ./test/sanity_test.sh
 ```
 
-#. Install all libraries to the temp folder for debug purposes
+Install libraries to the temp folder
+====================================
 
-   For example, install all libraries to /tmp/build.
-   If so, PKG_CONFIG_PATH has to be exported to ensure the env is set up correctly.
+   For example, install all libraries to a temp folder like /tmp/build for debugging purposes.\
+   If so, PKG_CONFIG_PATH has to be exported to ensure the env is set up correctly.\
    The pkg-config can be used for double-checking env.
 
 ```
@@ -105,13 +106,13 @@ Environment variable of uadk engine
 ===================================
 Introduction
 ------------
-Through the environment variable function, users can configure the number of
-queue resources that can be applied by different algorithms by setting the
+Through the environment variable function, users can configure the number of\
+queue resources that can be applied by different algorithms by setting the\
 algorithm switch in the openssl.cnf file.
 
 Usage
 -----
-1. Firstly, modify the openssl.cnf file, add the following settings at the beginning of this file:
+#. Firstly, modify the openssl.cnf file, add the following settings at the beginning of this file:
 
 ```
 openssl_cnf = openssl_def
@@ -126,10 +127,11 @@ UADK_CMD_ENABLE_CIPHER_ENV = 1
 UADK_CMD_ENABLE_DIGEST_ENV = 1
 UADK_CMD_ENABLE_ECC_ENV = 1
 ```
-Note: * The number 1 for enable environment variable, and 0 for disable environment variable.
-      * By default, you can find openssl.cnf file under /usr/local/ssl/ path.
+Note:
+* The number 1 for enable environment variable, and 0 for disable environment variable.
+* By default, you can find openssl.cnf file under /usr/local/ssl/ path.
 
-2. Secondly, use "export" command to set queue number.
+#. Secondly, use "export" command to set queue number.
 For example,
 ```
 export WD_RSA_CTX_NUM="sync:2@0,async:4@0"
@@ -138,10 +140,10 @@ export WD_CIPHER_CTX_NUM="sync:2@2,async:4@2"
 export WD_DIGEST_CTX_NUM="sync:2@2,async:4@2"
 export WD_ECC_CTX_NUM="sync:2@0,async:4@0"
 ```
-Note: * You can write these commands into ~/.bashrc file and source it, or just
-      input temporarily.
-      * "sync" indicates synchronous mode, "async" indicates asynchronous mode.
-      * "sync:2@0" means request 2 queues on numa-0 node, under synchronous mode.
-      * "async:2@0" means request 2 queues on numa-0 node, under asynchronous mode.
-      * If you do not perform the second step, the engine will use the default
-      setting:"sync:2@0, async:2@0" to request queues from hardware.
+Note:
+* You can write these commands into ~/.bashrc file and source it, or just input temporarily.
+* "sync" indicates synchronous mode, "async" indicates asynchronous mode.
+* "sync:2@0" means request 2 queues on numa-0 node, under synchronous mode.
+* "async:2@0" means request 2 queues on numa-0 node, under asynchronous mode.
+* If you do not perform the second step, the engine will use the default\
+  setting:"sync:2@0, async:2@0" to request queues from hardware.
