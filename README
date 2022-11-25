@@ -18,6 +18,8 @@ Prerequisites
 Installation Instruction
 ========================
 
+#. Install all libraries to system folder /usr/local/lib
+
 Build & Install OpenSSL
 -----------------------
 
@@ -40,7 +42,7 @@ Build & Install UADK
     cd uadk
     ./cleanup.sh
     ./autogen.sh
-    ./conf.sh
+    ./configure
     make
     sudo make install
 ```
@@ -64,6 +66,39 @@ Testing
 -------
 ```
     ./test/sanity_test.sh
+```
+
+#. Install all libraries to the temp folder for debug purposes
+
+   For example, install all libraries to /tmp/build.
+   If so, PKG_CONFIG_PATH has to be exported to ensure the env is set up correctly.
+   The pkg-config can be used for double-checking env.
+
+```
+    $ cd openssl
+    $ ./config --prefix=/tmp/build
+    $ make; make install
+
+    $ export PKG_CONFIG_PATH=/tmp/build/lib/pkgconfig/
+    $ pkg-config libcrypto --libs
+    -L/tmp/build/lib -lcrypto
+
+    $ cd uadk
+    $ ./autogen.sh
+    $ ./configure --prefix=/tmp/build
+    $ make; make install
+
+    $ pkg-config libwd --libs
+    -L/tmp/build/lib -lwd
+
+    $ cd openssl-uadk
+    $ autoreconf
+    $ ./configure --prefix=/tmp/build
+    $ make; make install
+
+    $ openssl engine -c /tmp/build/lib/uadk_engine.so
+    $ ./test/sanity_test.sh /tmp/build/lib/uadk_engine.so
+
 ```
 
 Environment variable of uadk engine
