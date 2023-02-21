@@ -244,8 +244,6 @@ static int digest_soft_init(struct digest_priv_ctx *priv)
 	uint32_t e_nid = priv->e_nid;
 	int ctx_len;
 
-	if (uadk_e_digests_soft_md(priv) == 0)
-		return 0;
 #ifdef CRYPTO3
 	if (EVP_DigestInit(priv->soft_ctx, priv->soft_md) != 1) {
 		fprintf(stderr, "EVP_DigestInit failed.\n");
@@ -558,7 +556,6 @@ static void digest_priv_ctx_cleanup(struct digest_priv_ctx *priv)
 	priv->switch_flag = 0;
 }
 
-
 static int uadk_digest_init(struct digest_priv_ctx *priv, int nid)
 {
 	int digest_counts = ARRAY_SIZE(digest_info_table);
@@ -605,7 +602,8 @@ static int uadk_digest_init(struct digest_priv_ctx *priv, int nid)
 		return 0;
 	}
 
-	priv->switch_threshold = sec_digest_get_sw_threshold(nid);
+	if (uadk_e_digests_soft_md(priv))
+		priv->switch_threshold = sec_digest_get_sw_threshold(nid);
 
 	return 1;
 
@@ -873,11 +871,8 @@ static int uadk_e_digest_final(EVP_MD_CTX *ctx, unsigned char *digest)
 }
 #endif
 
-static int uadk_e_digest_cleanup(EVP_MD_CTX *ctx)
+static int uadk_digest_cleanup(struct digest_priv_ctx *priv)
 {
-	struct digest_priv_ctx *priv =
-		(struct digest_priv_ctx *)EVP_MD_CTX_md_data(ctx);
-
 	/* Prevent double-free after the copy is used */
 	if (!priv || priv->copy)
 		return 1;
@@ -891,6 +886,14 @@ static int uadk_e_digest_cleanup(EVP_MD_CTX *ctx)
 		OPENSSL_free(priv->data);
 
 	return 1;
+}
+
+static int uadk_e_digest_cleanup(EVP_MD_CTX *ctx)
+{
+	struct digest_priv_ctx *priv =
+		(struct digest_priv_ctx *)EVP_MD_CTX_md_data(ctx);
+
+	return uadk_digest_cleanup(priv);
 }
 
 static int uadk_e_digest_copy(EVP_MD_CTX *to, const EVP_MD_CTX *from)
@@ -1067,10 +1070,10 @@ static int uadk_digest_default_get_params(OSSL_PARAM params[], size_t blksz,
 
 static void uadk_prov_freectx(void *dctx)
 {
-	struct digest_priv_ctx *ctx;
+	struct digest_priv_ctx *priv = (struct digest_priv_ctx *)dctx;
 
-	ctx = (struct digest_priv_ctx *)dctx;
-	OPENSSL_clear_free(ctx, sizeof(*ctx));
+	uadk_digest_cleanup(priv);
+	OPENSSL_clear_free(priv, sizeof(*priv));
 }
 
 static void *uadk_prov_dupctx(void *dctx)

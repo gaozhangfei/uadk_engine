@@ -33,13 +33,13 @@ struct p_uadk_ctx {
 static const char UADK_DEFAULT_PROPERTIES[] = "provider=uadk";
 
 const OSSL_ALGORITHM uadk_prov_digests[] = {
-	{ OSSL_DIGEST_NAME_MD5, UADK_DEFAULT_PROPERTIES, uadk_md5_functions },
-	{ OSSL_DIGEST_NAME_SM3, UADK_DEFAULT_PROPERTIES, uadk_sm3_functions },
-	{ OSSL_DIGEST_NAME_SHA1, UADK_DEFAULT_PROPERTIES, uadk_sha1_functions },
-	{ OSSL_DIGEST_NAME_SHA2_224, UADK_DEFAULT_PROPERTIES, uadk_sha224_functions },
-	{ OSSL_DIGEST_NAME_SHA2_256, UADK_DEFAULT_PROPERTIES, uadk_sha256_functions },
-	{ OSSL_DIGEST_NAME_SHA2_384, UADK_DEFAULT_PROPERTIES, uadk_sha384_functions },
-	{ OSSL_DIGEST_NAME_SHA2_512, UADK_DEFAULT_PROPERTIES, uadk_sha512_functions },
+	{ OSSL_DIGEST_NAME_MD5, UADK_DEFAULT_PROPERTIES, uadk_md5_functions, "uadk_provider md5" },
+	{ OSSL_DIGEST_NAME_SM3, UADK_DEFAULT_PROPERTIES, uadk_sm3_functions, "uadk_provider sm3" },
+	{ OSSL_DIGEST_NAME_SHA1, UADK_DEFAULT_PROPERTIES, uadk_sha1_functions, "uadk_provider sha1" },
+	{ OSSL_DIGEST_NAME_SHA2_224, UADK_DEFAULT_PROPERTIES, uadk_sha224_functions, "uadk_provider sha2-224" },
+	{ OSSL_DIGEST_NAME_SHA2_256, UADK_DEFAULT_PROPERTIES, uadk_sha256_functions, "uadk_provider sha2-256" },
+	{ OSSL_DIGEST_NAME_SHA2_384, UADK_DEFAULT_PROPERTIES, uadk_sha384_functions, "uadk_provider sha2-384" },
+	{ OSSL_DIGEST_NAME_SHA2_512, UADK_DEFAULT_PROPERTIES, uadk_sha512_functions, "uadk_provider sha2-512" },
 	{ NULL, NULL, NULL }
 };
 
