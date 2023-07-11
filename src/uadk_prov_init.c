@@ -80,6 +80,12 @@ const OSSL_ALGORITHM uadk_prov_ciphers[] = {
 	{ NULL, NULL, NULL }
 };
 
+static const OSSL_ALGORITHM uadk_prov_signature[] = {
+	{"RSA", UADK_DEFAULT_PROPERTIES,
+	 uadk_rsa_signature_functions, "uadk_provider rsa_signature" },
+	{NULL, NULL, NULL}
+};
+
 static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
 					  int *no_cache)
 {
@@ -90,6 +96,8 @@ static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
 		return uadk_prov_digests;
 	case OSSL_OP_CIPHER:
 		return uadk_prov_ciphers;
+	case OSSL_OP_SIGNATURE:
+		return uadk_prov_signature;
 	}
 	return NULL;
 }
@@ -100,6 +108,7 @@ static void p_teardown(void *provctx)
 
 	uadk_prov_destroy_digest();
 	uadk_prov_destroy_cipher();
+	uadk_prov_destroy_rsa();
 	OPENSSL_free(ctx);
 }
 
