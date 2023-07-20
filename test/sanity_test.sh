@@ -14,7 +14,8 @@ if [[ $version =~ "3.0" ]]; then
 	fi
 
 	digest_algs=$(openssl list -provider $engine_id -digest-algorithms)
-	cipher_algs=$(openssl list -provider $engine_id -digest-algorithms)
+	cipher_algs=$(openssl list -provider $engine_id -cipher-algorithms)
+	signature_algs=$(openssl list -provider $engine_id -signature-algorithms)
 fi
 
 if [[ $digest_algs =~ "uadk_provider" ]]; then
@@ -63,6 +64,10 @@ if [[ $cipher_algs =~ "uadk_provider" ]]; then
 	openssl speed -provider $engine_id -provider default -async_jobs 1 -evp sm4-ecb
 	openssl speed -provider $engine_id -provider default -async_jobs 1 -evp des-ede3-cbc
 	openssl speed -provider $engine_id -provider default -async_jobs 1 -evp des-ede3-ecb
+fi
+
+if [[ $signature_algs =~ "uadk_provider" ]]; then
+	echo "uadk_provider testing rsa"
 fi
 
 if [[ $version =~ "1.1.1" ]]; then

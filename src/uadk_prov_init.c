@@ -26,11 +26,6 @@
 #include "uadk_async.h"
 #include "uadk_prov.h"
 
-struct p_uadk_ctx {
-	const OSSL_CORE_HANDLE *handle;
-	OSSL_LIB_CTX *libctx;
-};
-
 const char *engine_uadk_id = "uadk_provider";
 static const char UADK_DEFAULT_PROPERTIES[] = "provider=uadk";
 
@@ -86,6 +81,12 @@ static const OSSL_ALGORITHM uadk_prov_signature[] = {
 	{NULL, NULL, NULL}
 };
 
+static const OSSL_ALGORITHM uadk_keymgmt[] = {
+	{"RSA", UADK_DEFAULT_PROPERTIES,
+	 uadk_rsa_keymgmt_functions, "QAT RSA Keymgmt implementation."},
+	{NULL, NULL, NULL}
+};
+
 static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
 					  int *no_cache)
 {
@@ -98,6 +99,8 @@ static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
 		return uadk_prov_ciphers;
 	case OSSL_OP_SIGNATURE:
 		return uadk_prov_signature;
+	case OSSL_OP_KEYMGMT:
+		return uadk_keymgmt;
 	}
 	return NULL;
 }

@@ -16,14 +16,17 @@
  */
 #include <openssl/bn.h>
 #include <openssl/core.h>
+#include <openssl/core_names.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
-#include <openssl/provider.h>
+#include <openssl/proverr.h>
 #include <openssl/rsa.h>
+#include <openssl/types.h>
 #include <uadk/wd_rsa.h>
 #include <uadk/wd_sched.h>
 #include "uadk_async.h"
 #include "uadk.h"
+#include "uadk_prov.h"
 
 #define UN_SET				0
 #define IS_SET				1
@@ -126,10 +129,6 @@ struct rsa_sched {
 	struct wd_sched wd_sched;
 };
 
-struct rsa_res_config {
-	struct rsa_sched sched;
-};
-
 /* Save rsa global hardware resource */
 struct rsa_res {
 	struct wd_ctx_config *ctx_res;
@@ -141,16 +140,134 @@ struct rsa_res {
 struct rsa_prov {
 	int pid;
 };
+static struct rsa_prov g_rsa_prov;
 
-static struct rsa_prov prov;
 static pthread_mutex_t rsa_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct rsa_priv_ctx {
-	RSA *rsa;
 	OSSL_LIB_CTX *libctx;
 	char *propq;
+	RSA *rsa;
+	int operation;
+
+	/*
+	 * Flag to determine if the hash function can be changed (1) or not (0)
+	 * Because it's dangerous to change during a DigestSign or DigestVerify
+	 * operation, this flag is cleared by their Init function, and set again
+	 * by their Final function.
+	 */
+	unsigned int flag_allow_md : 1;
+	unsigned int mgf1_md_set : 1;
+	
+	/* main digest */
+	EVP_MD *md;
+	EVP_MD_CTX *mdctx;
+	int mdnid;
+	char mdname[50]; /* Purely informational */
+	
+	/* RSA padding mode */
 	int pad_mode;
+	/* message digest for MGF1 */
+	EVP_MD *mgf1_md;
+	int mgf1_mdnid;
+	char mgf1_mdname[50]; /* Purely informational */
+	/* PSS salt length */
+	int saltlen;
+	/* Minimum salt length or -1 if no PSS parameter restriction */
+	int min_saltlen;
+	
+	/* Temp buffer */
+	unsigned char *tbuf;
 };
+
+struct rsa_st{
+    /*
+     * #legacy
+     * The first field is used to pickup errors where this is passed
+     * instead of an EVP_PKEY.  It is always zero.
+     * THIS MUST REMAIN THE FIRST FIELD.
+     */
+    int dummy_zero;
+
+    OSSL_LIB_CTX *libctx;
+    int32_t version;
+    const RSA_METHOD *meth;
+    /* functional reference if 'meth' is ENGINE-provided */
+    ENGINE *engine;
+    BIGNUM *n;
+    BIGNUM *e;
+    BIGNUM *d;
+    BIGNUM *p;
+    BIGNUM *q;
+    BIGNUM *dmp1;
+    BIGNUM *dmq1;
+    BIGNUM *iqmp;
+
+    /*
+     * If a PSS only key this contains the parameter restrictions.
+     * There are two structures for the same thing, used in different cases.
+     */
+    /* This is used uniquely by OpenSSL provider implementations. */
+    //RSA_PSS_PARAMS_30 pss_params;
+
+    /* This is used uniquely by rsa_ameth.c and rsa_pmeth.c. */
+    RSA_PSS_PARAMS *pss;
+    /* for multi-prime RSA, defined in RFC 8017 */
+    STACK_OF(RSA_PRIME_INFO) *prime_infos;
+    /* Be careful using this if the RSA structure is shared */
+    CRYPTO_EX_DATA ex_data;
+
+    int references; //CRYPTO_REF_COUNT references;
+    int flags;
+    /* Used to cache montgomery values */
+    BN_MONT_CTX *_method_mod_n;
+    BN_MONT_CTX *_method_mod_p;
+    BN_MONT_CTX *_method_mod_q;
+    BN_BLINDING *blinding;
+    BN_BLINDING *mt_blinding;
+    CRYPTO_RWLOCK *lock;
+
+    int dirty_cnt;
+};
+
+typedef struct rsa_st RSA;
+
+typedef int CRYPTO_REF_COUNT;
+
+struct evp_signature_st {
+    int name_id;
+    char *type_name;
+    const char *description;
+    OSSL_PROVIDER *prov;
+    CRYPTO_REF_COUNT refcnt;
+    CRYPTO_RWLOCK *lock;
+
+    OSSL_FUNC_signature_newctx_fn *newctx;
+    OSSL_FUNC_signature_sign_init_fn *sign_init;
+    OSSL_FUNC_signature_sign_fn *sign;
+    OSSL_FUNC_signature_verify_init_fn *verify_init;
+    OSSL_FUNC_signature_verify_fn *verify;
+    OSSL_FUNC_signature_verify_recover_init_fn *verify_recover_init;
+    OSSL_FUNC_signature_verify_recover_fn *verify_recover;
+    OSSL_FUNC_signature_digest_sign_init_fn *digest_sign_init;
+    OSSL_FUNC_signature_digest_sign_update_fn *digest_sign_update;
+    OSSL_FUNC_signature_digest_sign_final_fn *digest_sign_final;
+    OSSL_FUNC_signature_digest_sign_fn *digest_sign;
+    OSSL_FUNC_signature_digest_verify_init_fn *digest_verify_init;
+    OSSL_FUNC_signature_digest_verify_update_fn *digest_verify_update;
+    OSSL_FUNC_signature_digest_verify_final_fn *digest_verify_final;
+    OSSL_FUNC_signature_digest_verify_fn *digest_verify;
+    OSSL_FUNC_signature_freectx_fn *freectx;
+    OSSL_FUNC_signature_dupctx_fn *dupctx;
+    OSSL_FUNC_signature_get_ctx_params_fn *get_ctx_params;
+    OSSL_FUNC_signature_gettable_ctx_params_fn *gettable_ctx_params;
+    OSSL_FUNC_signature_set_ctx_params_fn *set_ctx_params;
+    OSSL_FUNC_signature_settable_ctx_params_fn *settable_ctx_params;
+    OSSL_FUNC_signature_get_ctx_md_params_fn *get_ctx_md_params;
+    OSSL_FUNC_signature_gettable_ctx_md_params_fn *gettable_ctx_md_params;
+    OSSL_FUNC_signature_set_ctx_md_params_fn *set_ctx_md_params;
+    OSSL_FUNC_signature_settable_ctx_md_params_fn *settable_ctx_md_params;
+} /* EVP_SIGNATURE */;
 
 enum {
 	INVALID = 0,
@@ -160,6 +277,25 @@ enum {
 	PRI_DEC,
 	MAX_CODE,
 };
+
+static int uadk_rsa_test_flags(const RSA *r, int flags)
+{
+	return r->flags & flags;
+}
+
+static int uadk_rsa_get_version(RSA *r)
+{
+	/* { two-prime(0), multi(1) } */
+	return r->version;
+} 
+
+static void uadk_rsa_get0_factors(const RSA *r, const BIGNUM **p, const BIGNUM **q)
+{
+    if (p != NULL)
+        *p = r->p;
+    if (q != NULL)
+        *q = r->q;
+}
 
 static int uadk_e_rsa_keygen(RSA *rsa, int bits, BIGNUM *e, BN_GENCB *cb);
 
@@ -394,10 +530,10 @@ static int check_rsa_is_crt(RSA *rsa)
 	const BIGNUM *iqmp = NULL;
 	int version;
 
-	if (RSA_test_flags(rsa, RSA_FLAG_EXT_PKEY))
+	if (uadk_rsa_test_flags(rsa, RSA_FLAG_EXT_PKEY))
 		return IS_SET;
 
-	version = RSA_get_version(rsa);
+	version = uadk_rsa_get_version(rsa);
 	if (version == RSA_ASN1_VERSION_MULTI)
 		return IS_SET;
 
@@ -655,60 +791,6 @@ static int rsa_get_verify_res(int padding, const BIGNUM *n, BIGNUM *ret_bn)
 	return UADK_E_SUCCESS;
 }
 
-static handle_t rsa_sched_init(handle_t h_sched_ctx, void *sched_param)
-{
-	return (handle_t)0;
-}
-
-static __u32 rsa_pick_next_ctx(handle_t sched_ctx,
-		void *sched_key, const int sched_mode)
-{
-	if (sched_mode)
-		return CTX_ASYNC;
-	else
-		return CTX_SYNC;
-}
-
-static int rsa_poll_policy(handle_t h_sched_ctx, __u32 expect, __u32 *count)
-{
-	return UADK_E_POLL_SUCCESS;
-}
-
-static int uadk_e_rsa_poll(void *ctx)
-{
-	__u64 rx_cnt = 0;
-	__u32 recv = 0;
-	int expt = 1;
-	int ret;
-
-	do {
-		ret = wd_rsa_poll_ctx(CTX_ASYNC, expt, &recv);
-		if (!ret && recv == expt)
-			return UADK_E_POLL_SUCCESS;
-		else if (ret == -EAGAIN)
-			rx_cnt++;
-		else
-			return UADK_E_POLL_FAIL;
-	} while (rx_cnt < ENGINE_RECV_MAX_CNT);
-
-	fprintf(stderr, "failed to recv msg: timeout!\n");
-
-	return -ETIMEDOUT;
-}
-
-static struct rsa_res_config rsa_res_config = {
-	.sched = {
-		.sched_type = -1,
-		.wd_sched = {
-			.name = "RSA RR",
-			.sched_init = rsa_sched_init,
-			.pick_next_ctx = rsa_pick_next_ctx,
-			.poll_policy = rsa_poll_policy,
-			.h_sched_ctx = 0,
-		},
-	},
-};
-
 static int uadk_e_rsa_env_poll(void *ctx)
 {
 	__u64 rx_cnt = 0;
@@ -729,92 +811,19 @@ static int uadk_e_rsa_env_poll(void *ctx)
 	return -ETIMEDOUT;
 }
 
-static int uadk_e_wd_rsa_env_init(struct uacce_dev *dev)
-{
-	int ret;
-
-	ret = uadk_e_set_env("WD_RSA_CTX_NUM", dev->numa_id);
-	if (ret)
-		return ret;
-
-	ret = wd_rsa_env_init(NULL);
-	if (ret)
-		return ret;
-
-	async_register_poll_fn(ASYNC_TASK_RSA, uadk_e_rsa_env_poll);
-
-	return 0;
-}
-
-static int uadk_e_wd_rsa_init(struct rsa_res_config *config,
-			      struct uacce_dev *dev)
-{
-	struct wd_sched *sched = &config->sched.wd_sched;
-	struct wd_ctx_config *ctx_cfg;
-	int ret;
-	int i;
-
-	ret = uadk_e_is_env_enabled("rsa");
-	if (ret == ENV_ENABLED)
-		return uadk_e_wd_rsa_env_init(dev);
-
-	ctx_cfg = calloc(1, sizeof(struct wd_ctx_config));
-	if (!ctx_cfg)
-		return -ENOMEM;
-
-	g_rsa_res.ctx_res = ctx_cfg;
-	ctx_cfg->ctx_num = CTX_NUM;
-	ctx_cfg->ctxs = calloc(CTX_NUM, sizeof(struct wd_ctx));
-	if (!ctx_cfg->ctxs) {
-		ret = -ENOMEM;
-		goto free_cfg;
-	}
-
-	for (i = 0; i < CTX_NUM; i++) {
-		ctx_cfg->ctxs[i].ctx = wd_request_ctx(dev);
-		if (!ctx_cfg->ctxs[i].ctx) {
-			ret = -ENOMEM;
-			goto free_ctx;
-		}
-		ctx_cfg->ctxs[i].ctx_mode = (i == 0) ? CTX_SYNC : CTX_ASYNC;
-	}
-
-	ret = wd_rsa_init(ctx_cfg, sched);
-	if (ret)
-		goto free_ctx;
-
-	async_register_poll_fn(ASYNC_TASK_RSA, uadk_e_rsa_poll);
-
-	return 0;
-
-free_ctx:
-	for (i = 0; i < CTX_NUM; i++) {
-		if (ctx_cfg->ctxs[i].ctx) {
-			wd_release_ctx(ctx_cfg->ctxs[i].ctx);
-			ctx_cfg->ctxs[i].ctx = 0;
-		}
-	}
-
-	free(ctx_cfg->ctxs);
-free_cfg:
-	free(ctx_cfg);
-	return ret;
-}
-
 static int uadk_e_rsa_init(void)
 {
 	struct uacce_dev *dev;
 	int ret;
 
 	pthread_mutex_lock(&rsa_mutex);
-	if (prov.pid != getpid()) {
-		ret = wd_rsa_init2(priv->alg_name, 0, 0);
+	if (g_rsa_prov.pid != getpid()) {
+		ret = wd_rsa_init2("rsa", 0, 0);
 		if (unlikely(ret)) {
-			priv->switch_flag = UADK_DO_SOFT;
-			goto soft_init;
+			return ret;
 		}
-		prov.pid = getpid();
-		async_register_poll_fn(ASYNC_TASK_RSA, uadk_rsa_env_poll);
+		g_rsa_prov.pid = getpid();
+		async_register_poll_fn(ASYNC_TASK_RSA, uadk_e_rsa_env_poll);
 	}
 	pthread_mutex_unlock(&rsa_mutex);
 
@@ -832,10 +841,6 @@ static int uadk_e_rsa_init(void)
 			return -ENOMEM;
 		}
 
-		ret = uadk_e_wd_rsa_init(&rsa_res_config, dev);
-		if (ret)
-			goto err_unlock;
-
 		g_rsa_res.numa_id = dev->numa_id;
 		g_rsa_res.pid = getpid();
 		pthread_spin_unlock(&g_rsa_res.lock);
@@ -845,32 +850,12 @@ static int uadk_e_rsa_init(void)
 	return UADK_E_INIT_SUCCESS;
 
 err_unlock:
+	g_rsa_res.ctx_res = NULL;
 	pthread_spin_unlock(&g_rsa_res.lock);
 	free(dev);
 	(void)fprintf(stderr, "failed to init rsa(%d)\n", ret);
 
 	return ret;
-}
-
-static void uadk_e_rsa_uninit(void)
-{
-	struct wd_ctx_config *ctx_cfg = g_rsa_res.ctx_res;
-	int i, ret;
-
-	if (g_rsa_res.pid == getpid()) {
-		ret = uadk_e_is_env_enabled("rsa");
-		if (ret == ENV_ENABLED) {
-			wd_rsa_env_uninit();
-		} else {
-			wd_rsa_uninit();
-			for (i = 0; i < ctx_cfg->ctx_num; i++)
-				wd_release_ctx(ctx_cfg->ctxs[i].ctx);
-			free(ctx_cfg->ctxs);
-			free(ctx_cfg);
-		}
-
-		g_rsa_res.pid = 0;
-	}
 }
 
 static struct uadk_rsa_sess *rsa_new_eng_session(RSA *rsa)
@@ -1123,7 +1108,7 @@ static int rsa_do_crypto(struct uadk_rsa_sess *rsa_sess)
 	}
 	cb_param.op = &op;
 	cb_param.priv = &(rsa_sess->req);
-	rsa_sess->req.cb = (void *)uadk_e_rsa_cb;
+	rsa_sess->req.cb = uadk_e_rsa_cb;
 	rsa_sess->req.cb_param = &cb_param;
 	rsa_sess->req.status = -1;
 
@@ -1214,8 +1199,10 @@ static int rsa_fill_keygen_data(struct uadk_rsa_sess *rsa_sess,
 		return UADK_E_FAIL;
 
 	rsa_sess->req.dst = wd_rsa_new_kg_out(rsa_sess->sess);
-	if (!rsa_sess->req.dst)
+	if (!rsa_sess->req.dst) {
+		wd_rsa_del_kg_in(rsa_sess->sess, rsa_sess->req.src);
 		return UADK_E_FAIL;
+	}
 
 	return UADK_E_SUCCESS;
 }
@@ -1830,13 +1817,6 @@ static RSA_METHOD *uadk_e_get_rsa_methods(void)
 	return rsa_hw_meth;
 }
 
-static void uadk_e_delete_rsa_meth(void)
-{
-	if (rsa_hw_meth) {
-		RSA_meth_free(rsa_hw_meth);
-		rsa_hw_meth = NULL;
-	}
-}
 
 /**
  * uadk_e_bind_rsa() - Set the access to get rsa methods to the ENGINE.
@@ -1847,22 +1827,100 @@ int uadk_e_bind_rsa(ENGINE *e)
 	return ENGINE_set_RSA(e, uadk_e_get_rsa_methods());
 }
 
-void uadk_e_destroy_rsa(void)
+static EVP_SIGNATURE get_default_rsa_signature()
 {
-	pthread_spin_destroy(&g_rsa_res.lock);
-	uadk_e_delete_rsa_meth();
-	uadk_e_rsa_uninit();
+    static EVP_SIGNATURE s_signature;
+    static int initilazed = 0;
+    if (!initilazed) {
+        EVP_SIGNATURE *signature = (EVP_SIGNATURE *)EVP_SIGNATURE_fetch(NULL, "RSA", "provider=default");
+        if (signature) {
+            s_signature = *signature;
+            EVP_SIGNATURE_free((EVP_SIGNATURE *)signature);
+            initilazed = 1;
+        } else {
+            WARN("EVP_SIGNATURE_fetch from default provider failed");
+        }
+    }
+    return s_signature;
 }
 
-void uadk_e_rsa_lock_init(void)
+static int uadk_rsa_signverify_init(void *vprsactx, void *vrsa,
+                                    const OSSL_PARAM params[], int operation)
 {
-	pthread_spin_init(&g_rsa_res.lock, PTHREAD_PROCESS_PRIVATE);
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+
+	if (priv == NULL || vrsa == NULL)
+		return 0;
+
+	priv->rsa = vrsa;
+	priv->operation = operation;
+
+	/* Maximum for sign, auto for verify */
+	priv->saltlen = RSA_PSS_SALTLEN_AUTO;
+	priv->min_saltlen = -1;
+
+	switch (uadk_rsa_test_flags(priv->rsa, RSA_FLAG_TYPE_MASK)) {
+	case RSA_FLAG_TYPE_RSA:
+		printf("RSA_FLAG_TYPE_RSA\n");
+		priv->pad_mode = RSA_PKCS1_PADDING;
+		break;
+	case RSA_FLAG_TYPE_RSASSAPSS:
+		printf("RSA_FLAG_TYPE_RSASSAPSS todo\n");
+		priv->pad_mode = RSA_PKCS1_PSS_PADDING;
+		break;
+	default:
+		ERR_raise(ERR_LIB_RSA, PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+	return 0;
+	}
+
+	return 1;
 }
 
+static int uadk_signature_rsa_verify_recover_init(void *vprsactx, void *vrsa,
+                                                  const OSSL_PARAM params[])
+{
+	printf("gzf %s\n", __func__);
+}
+
+static int uadk_signature_rsa_verify_recover(void *vprsactx,
+                                             unsigned char *rout,
+                                             size_t *routlen,
+                                             size_t routsize,
+                                             const unsigned char *sig,
+                                             size_t siglen)
+{
+	printf("gzf %s\n", __func__);
+}
+
+static int uadk_signature_rsa_verify_init(void *vprsactx, void *vrsa,
+                                          const OSSL_PARAM params[])
+{
+	printf("gzf %s\n", __func__);
+}
+static int uadk_signature_rsa_verify(void *vprsactx, const unsigned char *sig,
+                                    size_t siglen, const unsigned char *tbs,
+                                    size_t tbslen)
+{
+	printf("gzf %s\n", __func__);
+}
+static int uadk_signature_rsa_sign(void *vprsactx, unsigned char *sig,
+                                   size_t *siglen, size_t sigsize,
+                                   const unsigned char *tbs, size_t tbslen)
+{
+	printf("gzf %s\n", __func__);
+}
+
+static int uadk_signature_rsa_sign_init(void *vprsactx, void *vrsa, const OSSL_PARAM params[])
+{
+	printf("gzf %s\n", __func__);
+	return uadk_rsa_signverify_init(vprsactx, vrsa, params, EVP_PKEY_OP_SIGN);
+}
 static void *uadk_signature_rsa_newctx(void *provctx, const char *propq)
 {
 	struct rsa_priv_ctx *priv = NULL;
 	char *propq_copy = NULL;
+
+	printf("gzf %s provctx=%p\n", __func__, provctx);
 
 	if ((priv = OPENSSL_zalloc(sizeof(struct rsa_priv_ctx))) == NULL ||
 	    (propq != NULL && (propq_copy = OPENSSL_strdup(propq)) == NULL)) {
@@ -1872,6 +1930,7 @@ static void *uadk_signature_rsa_newctx(void *provctx, const char *propq)
 	}
 
 	priv->libctx = prov_libctx_of(provctx);
+	priv->flag_allow_md = 1;
 	priv->propq = propq_copy;
 	return priv;
 }
@@ -1883,9 +1942,204 @@ static void uadk_signature_rsa_freectx(void *vprsactx)
 	if (priv == NULL)
 		return;
 
+	printf("gzf %s\n", __func__);
 	OPENSSL_clear_free(priv, sizeof(*priv));
 
 	return;
+}
+
+static int uadk_signature_rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+{
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+
+	if (priv == NULL)
+		return 0;
+	if (params == NULL)
+		return 1;
+
+	/* todo */
+
+	printf("gzf %s\n", __func__);
+	return 1;
+}
+
+static const OSSL_PARAM settable_ctx_params[] = {
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PROPERTIES, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM settable_ctx_params_no_digest[] = {
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM *uadk_signature_rsa_settable_ctx_params(void *vprsactx,
+                                                               ossl_unused void *provctx)
+{
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+    if (priv != NULL && !priv->flag_allow_md)
+        return settable_ctx_params_no_digest;
+    return settable_ctx_params;
+}
+static int uadk_signature_rsa_digest_sign_init(void *vprsactx, const char *mdname,
+                                void *vrsa, const OSSL_PARAM params[])
+{
+    typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
+                                void *vrsa, const OSSL_PARAM params[]);
+    fun_ptr fun = get_default_rsa_signature().digest_sign_init;
+    if (!fun)
+        return 0;
+    return fun(vprsactx, mdname, vrsa, params);
+}
+
+static int uadk_signature_rsa_digest_signverify_update(void *vprsactx,
+                                        const unsigned char *data,
+                                        size_t datalen)
+{
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+
+    if (priv == NULL || priv->mdctx == NULL)
+        return 0;
+
+    return EVP_DigestUpdate(priv->mdctx, data, datalen);
+}
+
+static int uadk_signature_rsa_digest_sign_final(void *vprsactx, unsigned char *sig,
+                                 size_t *siglen, size_t sigsize)
+{
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int dlen = 0;
+
+    if (priv == NULL)
+        return 0;
+    priv->flag_allow_md = 1;
+    if (priv->mdctx == NULL)
+        return 0;
+    /*
+     * If sig is NULL then we're just finding out the sig size. Other fields
+     * are ignored. Defer to rsa_sign.
+     */
+    if (sig != NULL) {
+        /*
+         * The digests used here are all known (see rsa_get_md_nid()), so they
+         * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
+         */
+        if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
+            return 0;
+    }
+
+    return uadk_signature_rsa_sign(vprsactx, sig, siglen, sigsize,
+                                  digest, (size_t)dlen);
+}
+
+static int uadk_signature_rsa_digest_verify_init(void *vprsactx, const char *mdname,
+                                  void *vrsa, const OSSL_PARAM params[])
+{
+    typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
+                           void *vrsa, const OSSL_PARAM params[]);
+    fun_ptr fun = get_default_rsa_signature().digest_verify_init;
+    if (!fun)
+        return 0;
+    return fun(vprsactx, mdname, vrsa, params);
+}
+
+
+int uadk_signature_rsa_digest_verify_final(void *vprsactx, const unsigned char *sig,
+                                          size_t siglen)
+{
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int dlen = 0;
+
+    if (priv == NULL)
+        return 0;
+    priv->flag_allow_md = 1;
+    if (priv->mdctx == NULL)
+        return 0;
+
+    /*
+     * The digests used here are all known (see rsa_get_md_nid()), so they
+     * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
+     */
+    if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
+        return 0;
+
+    return uadk_signature_rsa_verify(vprsactx, sig, siglen,
+                                    digest, (size_t)dlen);
+}
+
+
+static void *uadk_signature_rsa_dupctx(void *vprsactx)
+{
+    typedef void* (*fun_ptr)(void *vprsactx);
+    fun_ptr fun = get_default_rsa_signature().dupctx;
+    if (!fun)
+        return NULL;
+    return fun(vprsactx);
+}
+
+static int uadk_signature_rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+{
+    typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
+    fun_ptr fun = get_default_rsa_signature().get_ctx_params;
+    if (!fun)
+        return 0;
+    return fun(vprsactx, params);
+}
+
+static const OSSL_PARAM *uadk_signature_rsa_gettable_ctx_md_params(void *vprsactx)
+{
+    typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
+    fun_ptr fun = get_default_rsa_signature().gettable_ctx_md_params;
+    if (!fun)
+        return NULL;
+    return fun(vprsactx);
+}
+
+
+static int uadk_signature_rsa_set_ctx_md_params(void *vprsactx, const OSSL_PARAM params[])
+{
+    typedef int (*fun_ptr)(void *vprsactx, const OSSL_PARAM params[]);
+    fun_ptr fun = get_default_rsa_signature().set_ctx_md_params;
+    if (!fun)
+        return 0;
+    return fun(vprsactx, params);
+}
+
+static const OSSL_PARAM *uadk_signature_rsa_settable_ctx_md_params(void *vprsactx)
+{
+    typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
+    fun_ptr fun = get_default_rsa_signature().settable_ctx_md_params;
+    if (!fun)
+        return NULL;
+    return fun(vprsactx);
+}
+
+static const OSSL_PARAM *uadk_signature_rsa_gettable_ctx_params(ossl_unused void *vprsactx,
+                                                 ossl_unused void *provctx)
+{
+    typedef const OSSL_PARAM * (*fun_ptr)(ossl_unused void *vprsactx,
+                                          ossl_unused void *provctx);
+    fun_ptr fun = get_default_rsa_signature().gettable_ctx_params;
+    if (!fun)
+        return NULL;
+    return fun(vprsactx, provctx);
+}
+
+static int uadk_signature_rsa_get_ctx_md_params(void *vprsactx, OSSL_PARAM *params)
+{
+    typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
+    fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
+    if (!fun)
+        return 0;
+    return fun(vprsactx, params);
 }
 
 const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
@@ -1921,7 +2175,6 @@ const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
 		(void (*)(void))uadk_signature_rsa_digest_signverify_update },
 	{OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL,
 		(void (*)(void))uadk_signature_rsa_digest_verify_final },
-  /*
 	{OSSL_FUNC_SIGNATURE_DUPCTX,
 		(void (*)(void))uadk_signature_rsa_dupctx },
 	{OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS,
@@ -1936,16 +2189,15 @@ const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
 		(void (*)(void))uadk_signature_rsa_set_ctx_md_params },
 	{OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS,
 		(void (*)(void))uadk_signature_rsa_settable_ctx_md_params },
-  */
 	{0, NULL}
 };
 
 void uadk_prov_destroy_rsa(void)
 {
 	pthread_mutex_lock(&rsa_mutex);
-	if (prov.pid == getpid()) {
+	if (g_rsa_prov.pid == getpid()) {
 		wd_rsa_uninit2();
-		prov.pid = 0;
+		g_rsa_prov.pid = 0;
 	}
 	pthread_mutex_unlock(&rsa_mutex);
 }
