@@ -791,7 +791,7 @@ static int rsa_get_verify_res(int padding, const BIGNUM *n, BIGNUM *ret_bn)
 	return UADK_E_SUCCESS;
 }
 
-static int uadk_e_rsa_env_poll(void *ctx)
+static int uadk_rsa_env_poll(void *ctx)
 {
 	__u64 rx_cnt = 0;
 	__u32 recv = 0;
@@ -811,9 +811,8 @@ static int uadk_e_rsa_env_poll(void *ctx)
 	return -ETIMEDOUT;
 }
 
-static int uadk_e_rsa_init(void)
+static int uadk_prov_rsa_init(void)
 {
-	struct uacce_dev *dev;
 	int ret;
 
 	pthread_mutex_lock(&rsa_mutex);
@@ -823,39 +822,11 @@ static int uadk_e_rsa_init(void)
 			return ret;
 		}
 		g_rsa_prov.pid = getpid();
-		async_register_poll_fn(ASYNC_TASK_RSA, uadk_e_rsa_env_poll);
+		async_register_poll_fn(ASYNC_TASK_RSA, uadk_rsa_env_poll);
 	}
 	pthread_mutex_unlock(&rsa_mutex);
 
-	if (g_rsa_res.pid != getpid()) {
-		pthread_spin_lock(&g_rsa_res.lock);
-		if (g_rsa_res.pid == getpid()) {
-			pthread_spin_unlock(&g_rsa_res.lock);
-			return UADK_E_INIT_SUCCESS;
-		}
-
-		dev = wd_get_accel_dev("rsa");
-		if (!dev) {
-			pthread_spin_unlock(&g_rsa_res.lock);
-			fprintf(stderr, "failed to get device for rsa\n");
-			return -ENOMEM;
-		}
-
-		g_rsa_res.numa_id = dev->numa_id;
-		g_rsa_res.pid = getpid();
-		pthread_spin_unlock(&g_rsa_res.lock);
-		free(dev);
-	}
-
 	return UADK_E_INIT_SUCCESS;
-
-err_unlock:
-	g_rsa_res.ctx_res = NULL;
-	pthread_spin_unlock(&g_rsa_res.lock);
-	free(dev);
-	(void)fprintf(stderr, "failed to init rsa(%d)\n", ret);
-
-	return ret;
 }
 
 static struct uadk_rsa_sess *rsa_new_eng_session(RSA *rsa)
@@ -1389,7 +1360,7 @@ static int uadk_e_rsa_keygen(RSA *rsa, int bits, BIGNUM *e, BN_GENCB *cb)
 	if (!ret || ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_e_rsa_init();
+	ret = uadk_prov_rsa_init();
 	if (ret)
 		goto exe_soft;
 
@@ -1456,7 +1427,7 @@ static int uadk_e_rsa_public_encrypt(int flen, const unsigned char *from,
 	if (!ret || ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_e_rsa_init();
+	ret = uadk_prov_rsa_init();
 	if (ret)
 		goto exe_soft;
 
@@ -1536,7 +1507,7 @@ static int uadk_e_rsa_private_decrypt(int flen, const unsigned char *from,
 	if (!ret || ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_e_rsa_init();
+	ret = uadk_prov_rsa_init();
 	if (ret)
 		goto exe_soft;
 
@@ -1620,7 +1591,7 @@ static int uadk_e_rsa_private_sign(int flen, const unsigned char *from,
 	if (!ret || ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_e_rsa_init();
+	ret = uadk_prov_rsa_init();
 	if (ret)
 		goto exe_soft;
 
@@ -1714,7 +1685,7 @@ static int uadk_e_rsa_public_verify(int flen, const unsigned char *from,
 	else if (ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_e_rsa_init();
+	ret = uadk_prov_rsa_init();
 	if (ret)
 		goto exe_soft;
 
@@ -1838,7 +1809,7 @@ static EVP_SIGNATURE get_default_rsa_signature()
             EVP_SIGNATURE_free((EVP_SIGNATURE *)signature);
             initilazed = 1;
         } else {
-            WARN("EVP_SIGNATURE_fetch from default provider failed");
+            fprintf(stderr, "EVP_SIGNATURE_fetch from default provider failed");
         }
     }
     return s_signature;
@@ -1870,7 +1841,7 @@ static int uadk_rsa_signverify_init(void *vprsactx, void *vrsa,
 		break;
 	default:
 		ERR_raise(ERR_LIB_RSA, PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
-	return 0;
+		return 0;
 	}
 
 	return 1;
@@ -1880,6 +1851,7 @@ static int uadk_signature_rsa_verify_recover_init(void *vprsactx, void *vrsa,
                                                   const OSSL_PARAM params[])
 {
 	printf("gzf %s\n", __func__);
+	return 1;
 }
 
 static int uadk_signature_rsa_verify_recover(void *vprsactx,
@@ -1890,24 +1862,28 @@ static int uadk_signature_rsa_verify_recover(void *vprsactx,
                                              size_t siglen)
 {
 	printf("gzf %s\n", __func__);
+	return 1;
 }
 
 static int uadk_signature_rsa_verify_init(void *vprsactx, void *vrsa,
                                           const OSSL_PARAM params[])
 {
 	printf("gzf %s\n", __func__);
+	return 1;
 }
 static int uadk_signature_rsa_verify(void *vprsactx, const unsigned char *sig,
                                     size_t siglen, const unsigned char *tbs,
                                     size_t tbslen)
 {
 	printf("gzf %s\n", __func__);
+	return 1;
 }
 static int uadk_signature_rsa_sign(void *vprsactx, unsigned char *sig,
                                    size_t *siglen, size_t sigsize,
                                    const unsigned char *tbs, size_t tbslen)
 {
 	printf("gzf %s\n", __func__);
+	return 1;
 }
 
 static int uadk_signature_rsa_sign_init(void *vprsactx, void *vrsa, const OSSL_PARAM params[])
@@ -2082,6 +2058,7 @@ static void *uadk_signature_rsa_dupctx(void *vprsactx)
     fun_ptr fun = get_default_rsa_signature().dupctx;
     if (!fun)
         return NULL;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx);
 }
 
@@ -2091,6 +2068,7 @@ static int uadk_signature_rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
     fun_ptr fun = get_default_rsa_signature().get_ctx_params;
     if (!fun)
         return 0;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx, params);
 }
 
@@ -2100,6 +2078,7 @@ static const OSSL_PARAM *uadk_signature_rsa_gettable_ctx_md_params(void *vprsact
     fun_ptr fun = get_default_rsa_signature().gettable_ctx_md_params;
     if (!fun)
         return NULL;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx);
 }
 
@@ -2110,6 +2089,7 @@ static int uadk_signature_rsa_set_ctx_md_params(void *vprsactx, const OSSL_PARAM
     fun_ptr fun = get_default_rsa_signature().set_ctx_md_params;
     if (!fun)
         return 0;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx, params);
 }
 
@@ -2119,6 +2099,7 @@ static const OSSL_PARAM *uadk_signature_rsa_settable_ctx_md_params(void *vprsact
     fun_ptr fun = get_default_rsa_signature().settable_ctx_md_params;
     if (!fun)
         return NULL;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx);
 }
 
@@ -2130,6 +2111,7 @@ static const OSSL_PARAM *uadk_signature_rsa_gettable_ctx_params(ossl_unused void
     fun_ptr fun = get_default_rsa_signature().gettable_ctx_params;
     if (!fun)
         return NULL;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx, provctx);
 }
 
@@ -2139,8 +2121,10 @@ static int uadk_signature_rsa_get_ctx_md_params(void *vprsactx, OSSL_PARAM *para
     fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
     if (!fun)
         return 0;
+    printf("gzf %s\n", __func__);
     return fun(vprsactx, params);
 }
+
 
 const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
 	{OSSL_FUNC_SIGNATURE_NEWCTX,

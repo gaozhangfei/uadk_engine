@@ -72,7 +72,6 @@ static void *uadk_keymgmt_rsa_newdata(void *provctx)
     fun_ptr fun = get_default_keymgmt().new;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
     return fun(provctx);
 }
 
@@ -82,7 +81,7 @@ static void uadk_keymgmt_rsa_freedata(void *keydata)
     fun_ptr fun = get_default_keymgmt().free;
     if (!fun)
         return;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     fun(keydata);
 }
 
@@ -93,7 +92,7 @@ static int uadk_keymgmt_rsa_has(const void *keydata, int selection)
     if (!fun)
         return 0;
 
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(keydata,selection);
 }
 
@@ -103,7 +102,7 @@ static int uadk_keymgmt_rsa_import(void *keydata, int selection, const OSSL_PARA
     fun_ptr fun = get_default_keymgmt().import;
     if (!fun)
         return 0;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(keydata,selection,params);
 }
 
@@ -113,7 +112,7 @@ static const OSSL_PARAM *uadk_keymgmt_rsa_import_types(int selection)
     fun_ptr fun = get_default_keymgmt().import_types;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(selection);
 }
 
@@ -124,7 +123,7 @@ static void *uadk_keymgmt_rsa_gen_init(void *provctx, int selection,
     fun_ptr fun = get_default_keymgmt().gen_init;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(provctx, selection, params);
 }
 
@@ -153,7 +152,7 @@ static void *uadk_keymgmt_rsa_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cba
     fun_ptr fun = get_default_keymgmt().gen;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(genctx, osslcb, cbarg);
 }
 
@@ -163,7 +162,7 @@ static void uadk_keymgmt_rsa_gen_cleanup(void *genctx)
     fun_ptr fun = get_default_keymgmt().gen_cleanup;
     if (!fun)
         return;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     fun(genctx);
 }
 
@@ -173,7 +172,7 @@ static void *uadk_keymgmt_rsa_load(const void *reference, size_t reference_sz)
     fun_ptr fun = get_default_keymgmt().load;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(reference, reference_sz);
 }
 
@@ -238,7 +237,7 @@ static void *uadk_keymgmt_rsa_dup(const void *keydata_from, int selection)
     fun_ptr fun = get_default_keymgmt().dup;
     if (!fun)
         return NULL;
-	printf("gzf %s\n", __func__);
+    printf("gzf %s\n", __func__);
     return fun(keydata_from, selection);
 }
 
