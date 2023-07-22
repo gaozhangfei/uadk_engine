@@ -176,58 +176,57 @@ struct rsa_priv_ctx {
 	/* Minimum salt length or -1 if no PSS parameter restriction */
 	int min_saltlen;
 	
-	/* Temp buffer */
-	unsigned char *tbuf;
+	unsigned int soft : 1;
 };
 
 struct rsa_st{
-    /*
-     * #legacy
-     * The first field is used to pickup errors where this is passed
-     * instead of an EVP_PKEY.  It is always zero.
-     * THIS MUST REMAIN THE FIRST FIELD.
-     */
-    int dummy_zero;
+	/*
+	 * #legacy
+	 * The first field is used to pickup errors where this is passed
+	 * instead of an EVP_PKEY.  It is always zero.
+	 * THIS MUST REMAIN THE FIRST FIELD.
+	 */
+	int dummy_zero;
 
-    OSSL_LIB_CTX *libctx;
-    int32_t version;
-    const RSA_METHOD *meth;
-    /* functional reference if 'meth' is ENGINE-provided */
-    ENGINE *engine;
-    BIGNUM *n;
-    BIGNUM *e;
-    BIGNUM *d;
-    BIGNUM *p;
-    BIGNUM *q;
-    BIGNUM *dmp1;
-    BIGNUM *dmq1;
-    BIGNUM *iqmp;
+	OSSL_LIB_CTX *libctx;
+	int32_t version;
+	const RSA_METHOD *meth;
+	/* functional reference if 'meth' is ENGINE-provided */
+	ENGINE *engine;
+	BIGNUM *n;
+	BIGNUM *e;
+	BIGNUM *d;
+	BIGNUM *p;
+	BIGNUM *q;
+	BIGNUM *dmp1;
+	BIGNUM *dmq1;
+	BIGNUM *iqmp;
 
-    /*
-     * If a PSS only key this contains the parameter restrictions.
-     * There are two structures for the same thing, used in different cases.
-     */
-    /* This is used uniquely by OpenSSL provider implementations. */
-    //RSA_PSS_PARAMS_30 pss_params;
+	/*
+	 * If a PSS only key this contains the parameter restrictions.
+	 * There are two structures for the same thing, used in different cases.
+	 */
+	/* This is used uniquely by OpenSSL provider implementations. */
+	/* RSA_PSS_PARAMS_30 pss_params; */
 
-    /* This is used uniquely by rsa_ameth.c and rsa_pmeth.c. */
-    RSA_PSS_PARAMS *pss;
-    /* for multi-prime RSA, defined in RFC 8017 */
-    STACK_OF(RSA_PRIME_INFO) *prime_infos;
-    /* Be careful using this if the RSA structure is shared */
-    CRYPTO_EX_DATA ex_data;
+	/* This is used uniquely by rsa_ameth.c and rsa_pmeth.c. */
+	RSA_PSS_PARAMS *pss;
+	/* for multi-prime RSA, defined in RFC 8017 */
+	STACK_OF(RSA_PRIME_INFO) *prime_infos;
+	/* Be careful using this if the RSA structure is shared */
+	CRYPTO_EX_DATA ex_data;
 
-    int references; //CRYPTO_REF_COUNT references;
-    int flags;
-    /* Used to cache montgomery values */
-    BN_MONT_CTX *_method_mod_n;
-    BN_MONT_CTX *_method_mod_p;
-    BN_MONT_CTX *_method_mod_q;
-    BN_BLINDING *blinding;
-    BN_BLINDING *mt_blinding;
-    CRYPTO_RWLOCK *lock;
+	int references; //CRYPTO_REF_COUNT references;
+	int flags;
+	/* Used to cache montgomery values */
+	BN_MONT_CTX *_method_mod_n;
+	BN_MONT_CTX *_method_mod_p;
+	BN_MONT_CTX *_method_mod_q;
+	BN_BLINDING *blinding;
+	BN_BLINDING *mt_blinding;
+	CRYPTO_RWLOCK *lock;
 
-    int dirty_cnt;
+	int dirty_cnt;
 };
 
 typedef struct rsa_st RSA;
@@ -235,38 +234,38 @@ typedef struct rsa_st RSA;
 typedef int CRYPTO_REF_COUNT;
 
 struct evp_signature_st {
-    int name_id;
-    char *type_name;
-    const char *description;
-    OSSL_PROVIDER *prov;
-    CRYPTO_REF_COUNT refcnt;
-    CRYPTO_RWLOCK *lock;
+	int name_id;
+	char *type_name;
+	const char *description;
+	OSSL_PROVIDER *prov;
+	CRYPTO_REF_COUNT refcnt;
+	CRYPTO_RWLOCK *lock;
 
-    OSSL_FUNC_signature_newctx_fn *newctx;
-    OSSL_FUNC_signature_sign_init_fn *sign_init;
-    OSSL_FUNC_signature_sign_fn *sign;
-    OSSL_FUNC_signature_verify_init_fn *verify_init;
-    OSSL_FUNC_signature_verify_fn *verify;
-    OSSL_FUNC_signature_verify_recover_init_fn *verify_recover_init;
-    OSSL_FUNC_signature_verify_recover_fn *verify_recover;
-    OSSL_FUNC_signature_digest_sign_init_fn *digest_sign_init;
-    OSSL_FUNC_signature_digest_sign_update_fn *digest_sign_update;
-    OSSL_FUNC_signature_digest_sign_final_fn *digest_sign_final;
-    OSSL_FUNC_signature_digest_sign_fn *digest_sign;
-    OSSL_FUNC_signature_digest_verify_init_fn *digest_verify_init;
-    OSSL_FUNC_signature_digest_verify_update_fn *digest_verify_update;
-    OSSL_FUNC_signature_digest_verify_final_fn *digest_verify_final;
-    OSSL_FUNC_signature_digest_verify_fn *digest_verify;
-    OSSL_FUNC_signature_freectx_fn *freectx;
-    OSSL_FUNC_signature_dupctx_fn *dupctx;
-    OSSL_FUNC_signature_get_ctx_params_fn *get_ctx_params;
-    OSSL_FUNC_signature_gettable_ctx_params_fn *gettable_ctx_params;
-    OSSL_FUNC_signature_set_ctx_params_fn *set_ctx_params;
-    OSSL_FUNC_signature_settable_ctx_params_fn *settable_ctx_params;
-    OSSL_FUNC_signature_get_ctx_md_params_fn *get_ctx_md_params;
-    OSSL_FUNC_signature_gettable_ctx_md_params_fn *gettable_ctx_md_params;
-    OSSL_FUNC_signature_set_ctx_md_params_fn *set_ctx_md_params;
-    OSSL_FUNC_signature_settable_ctx_md_params_fn *settable_ctx_md_params;
+	OSSL_FUNC_signature_newctx_fn *newctx;
+	OSSL_FUNC_signature_sign_init_fn *sign_init;
+	OSSL_FUNC_signature_sign_fn *sign;
+	OSSL_FUNC_signature_verify_init_fn *verify_init;
+	OSSL_FUNC_signature_verify_fn *verify;
+	OSSL_FUNC_signature_verify_recover_init_fn *verify_recover_init;
+	OSSL_FUNC_signature_verify_recover_fn *verify_recover;
+	OSSL_FUNC_signature_digest_sign_init_fn *digest_sign_init;
+	OSSL_FUNC_signature_digest_sign_update_fn *digest_sign_update;
+	OSSL_FUNC_signature_digest_sign_final_fn *digest_sign_final;
+	OSSL_FUNC_signature_digest_sign_fn *digest_sign;
+	OSSL_FUNC_signature_digest_verify_init_fn *digest_verify_init;
+	OSSL_FUNC_signature_digest_verify_update_fn *digest_verify_update;
+	OSSL_FUNC_signature_digest_verify_final_fn *digest_verify_final;
+	OSSL_FUNC_signature_digest_verify_fn *digest_verify;
+	OSSL_FUNC_signature_freectx_fn *freectx;
+	OSSL_FUNC_signature_dupctx_fn *dupctx;
+	OSSL_FUNC_signature_get_ctx_params_fn *get_ctx_params;
+	OSSL_FUNC_signature_gettable_ctx_params_fn *gettable_ctx_params;
+	OSSL_FUNC_signature_set_ctx_params_fn *set_ctx_params;
+	OSSL_FUNC_signature_settable_ctx_params_fn *settable_ctx_params;
+	OSSL_FUNC_signature_get_ctx_md_params_fn *get_ctx_md_params;
+	OSSL_FUNC_signature_gettable_ctx_md_params_fn *gettable_ctx_md_params;
+	OSSL_FUNC_signature_set_ctx_md_params_fn *set_ctx_md_params;
+	OSSL_FUNC_signature_settable_ctx_md_params_fn *settable_ctx_md_params;
 } /* EVP_SIGNATURE */;
 
 enum {
@@ -291,10 +290,15 @@ static int uadk_rsa_get_version(RSA *r)
 
 static void uadk_rsa_get0_factors(const RSA *r, const BIGNUM **p, const BIGNUM **q)
 {
-    if (p != NULL)
-        *p = r->p;
-    if (q != NULL)
-        *q = r->q;
+	if (p != NULL)
+		*p = r->p;
+	if (q != NULL)
+		*q = r->q;
+}
+
+int uadk_rsa_size(const RSA *r)
+{
+	return BN_num_bytes(r->n);
 }
 
 static int uadk_e_rsa_keygen(RSA *rsa, int bits, BIGNUM *e, BN_GENCB *cb);
@@ -1591,10 +1595,6 @@ static int uadk_e_rsa_private_sign(int flen, const unsigned char *from,
 	if (!ret || ret == SOFT)
 		goto exe_soft;
 
-	ret = uadk_prov_rsa_init();
-	if (ret)
-		goto exe_soft;
-
 	ret = rsa_pkey_param_alloc(NULL, &pri);
 	if (ret == -ENOMEM)
 		goto exe_soft;
@@ -1759,6 +1759,7 @@ exe_soft:
 				   (flen, from, to, rsa, padding);
 }
 
+#if 0
 /**
  * uadk_get_rsa_method() - Set rsa hardware methods of the RSA implementation which
  * can be called from ENGINE structure.
@@ -1787,16 +1788,7 @@ static RSA_METHOD *uadk_e_get_rsa_methods(void)
 
 	return rsa_hw_meth;
 }
-
-
-/**
- * uadk_e_bind_rsa() - Set the access to get rsa methods to the ENGINE.
- * @e: uadk engine
- */
-int uadk_e_bind_rsa(ENGINE *e)
-{
-	return ENGINE_set_RSA(e, uadk_e_get_rsa_methods());
-}
+#endif
 
 static EVP_SIGNATURE get_default_rsa_signature()
 {
@@ -1844,6 +1836,9 @@ static int uadk_rsa_signverify_init(void *vprsactx, void *vrsa,
 		return 0;
 	}
 
+	if (uadk_prov_rsa_init())
+		priv->soft = 1;
+
 	return 1;
 }
 
@@ -1869,20 +1864,63 @@ static int uadk_signature_rsa_verify_init(void *vprsactx, void *vrsa,
                                           const OSSL_PARAM params[])
 {
 	printf("gzf %s\n", __func__);
-	return 1;
+	return uadk_rsa_signverify_init(vprsactx, vrsa, params, EVP_PKEY_OP_VERIFY);
 }
+
 static int uadk_signature_rsa_verify(void *vprsactx, const unsigned char *sig,
                                     size_t siglen, const unsigned char *tbs,
                                     size_t tbslen)
 {
-	printf("gzf %s\n", __func__);
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	size_t rslen = 0;
+
+	/* todo call public_verify */
+	if (priv->md != NULL) {
+		/* todo */
+	} else {
+		rslen = uadk_e_rsa_public_verify(siglen, sig, tbs, priv->rsa, priv->pad_mode);
+	}
+
+	if ((rslen != tbslen))
+		return 0;
+
 	return 1;
 }
+
+static size_t rsa_get_md_size(struct rsa_priv_ctx *priv)
+{
+    if (priv->md != NULL)
+        return EVP_MD_size(priv->md);
+    return 0;
+}
+
 static int uadk_signature_rsa_sign(void *vprsactx, unsigned char *sig,
                                    size_t *siglen, size_t sigsize,
                                    const unsigned char *tbs, size_t tbslen)
 {
-	printf("gzf %s\n", __func__);
+	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	size_t rsasize = uadk_rsa_size(priv->rsa);
+	size_t mdsize = rsa_get_md_size(priv);
+	int ret;
+
+	if (sig == NULL) {
+		*siglen = rsasize;
+		return 1;
+	}
+
+	if (sigsize < rsasize) {
+		ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE,
+			       "is %zu, should be at least %zu", sigsize, rsasize);
+		return 0;
+	}
+
+	if (mdsize != 0) {
+		/* todo */
+	}
+
+	ret = uadk_e_rsa_private_sign(tbslen, tbs, sig, priv->rsa, priv->pad_mode);
+	*siglen = ret;
+
 	return 1;
 }
 
@@ -1891,6 +1929,7 @@ static int uadk_signature_rsa_sign_init(void *vprsactx, void *vrsa, const OSSL_P
 	printf("gzf %s\n", __func__);
 	return uadk_rsa_signverify_init(vprsactx, vrsa, params, EVP_PKEY_OP_SIGN);
 }
+
 static void *uadk_signature_rsa_newctx(void *provctx, const char *propq)
 {
 	struct rsa_priv_ctx *priv = NULL;
@@ -1905,6 +1944,7 @@ static void *uadk_signature_rsa_newctx(void *provctx, const char *propq)
 		return NULL;
 	}
 
+	printf("gzf %s priv->soft=%d\n", __func__, priv->soft);
 	priv->libctx = prov_libctx_of(provctx);
 	priv->flag_allow_md = 1;
 	priv->propq = propq_copy;
@@ -1940,38 +1980,47 @@ static int uadk_signature_rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM pa
 }
 
 static const OSSL_PARAM settable_ctx_params[] = {
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PROPERTIES, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
-    OSSL_PARAM_END};
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PROPERTIES, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+	OSSL_PARAM_END
+};
 
 static const OSSL_PARAM settable_ctx_params_no_digest[] = {
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
-    OSSL_PARAM_END};
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
+	OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+	OSSL_PARAM_END
+};
 
-static const OSSL_PARAM *uadk_signature_rsa_settable_ctx_params(void *vprsactx,
-                                                               ossl_unused void *provctx)
+static const OSSL_PARAM
+*uadk_signature_rsa_settable_ctx_params(void *vprsactx,
+					ossl_unused void *provctx)
 {
 	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
-    if (priv != NULL && !priv->flag_allow_md)
-        return settable_ctx_params_no_digest;
-    return settable_ctx_params;
+
+	if (priv != NULL && !priv->flag_allow_md)
+		return settable_ctx_params_no_digest;
+
+	return settable_ctx_params;
 }
-static int uadk_signature_rsa_digest_sign_init(void *vprsactx, const char *mdname,
-                                void *vrsa, const OSSL_PARAM params[])
+
+static int
+uadk_signature_rsa_digest_sign_init(void *vprsactx, const char *mdname,
+				    void *vrsa, const OSSL_PARAM params[])
 {
-    typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
-                                void *vrsa, const OSSL_PARAM params[]);
-    fun_ptr fun = get_default_rsa_signature().digest_sign_init;
-    if (!fun)
-        return 0;
-    return fun(vprsactx, mdname, vrsa, params);
+	typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
+			       void *vrsa, const OSSL_PARAM params[]);
+
+	fun_ptr fun = get_default_rsa_signature().digest_sign_init;
+	if (!fun)
+		return 0;
+
+	return fun(vprsactx, mdname, vrsa, params);
 }
 
 static int uadk_signature_rsa_digest_signverify_update(void *vprsactx,
@@ -1980,50 +2029,53 @@ static int uadk_signature_rsa_digest_signverify_update(void *vprsactx,
 {
 	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
 
-    if (priv == NULL || priv->mdctx == NULL)
-        return 0;
+	if (priv == NULL || priv->mdctx == NULL)
+		return 0;
 
-    return EVP_DigestUpdate(priv->mdctx, data, datalen);
+	return EVP_DigestUpdate(priv->mdctx, data, datalen);
 }
 
 static int uadk_signature_rsa_digest_sign_final(void *vprsactx, unsigned char *sig,
-                                 size_t *siglen, size_t sigsize)
+						size_t *siglen, size_t sigsize)
 {
 	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
-    unsigned char digest[EVP_MAX_MD_SIZE];
-    unsigned int dlen = 0;
+	unsigned char digest[EVP_MAX_MD_SIZE];
+	unsigned int dlen = 0;
 
-    if (priv == NULL)
-        return 0;
-    priv->flag_allow_md = 1;
-    if (priv->mdctx == NULL)
-        return 0;
-    /*
-     * If sig is NULL then we're just finding out the sig size. Other fields
-     * are ignored. Defer to rsa_sign.
-     */
-    if (sig != NULL) {
-        /*
-         * The digests used here are all known (see rsa_get_md_nid()), so they
-         * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
-         */
-        if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
-            return 0;
-    }
+	if (priv == NULL)
+		return 0;
+	priv->flag_allow_md = 1;
 
-    return uadk_signature_rsa_sign(vprsactx, sig, siglen, sigsize,
-                                  digest, (size_t)dlen);
+	if (priv->mdctx == NULL)
+		return 0;
+	/*
+	 * If sig is NULL then we're just finding out the sig size. Other fields
+	 * are ignored. Defer to rsa_sign.
+	 */
+	if (sig != NULL) {
+		/*
+		 * The digests used here are all known (see rsa_get_md_nid()), so they
+		 * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
+		 */
+		if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
+			return 0;
+	}
+
+	return uadk_signature_rsa_sign(vprsactx, sig, siglen, sigsize,
+				       digest, (size_t)dlen);
 }
 
 static int uadk_signature_rsa_digest_verify_init(void *vprsactx, const char *mdname,
                                   void *vrsa, const OSSL_PARAM params[])
 {
-    typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
-                           void *vrsa, const OSSL_PARAM params[]);
-    fun_ptr fun = get_default_rsa_signature().digest_verify_init;
-    if (!fun)
-        return 0;
-    return fun(vprsactx, mdname, vrsa, params);
+	typedef int (*fun_ptr)(void *vprsactx, const char *mdname,
+			       void *vrsa, const OSSL_PARAM params[]);
+	fun_ptr fun = get_default_rsa_signature().digest_verify_init;
+
+	if (!fun)
+		return 0;
+
+	return fun(vprsactx, mdname, vrsa, params);
 }
 
 
@@ -2054,12 +2106,15 @@ int uadk_signature_rsa_digest_verify_final(void *vprsactx, const unsigned char *
 
 static void *uadk_signature_rsa_dupctx(void *vprsactx)
 {
-    typedef void* (*fun_ptr)(void *vprsactx);
-    fun_ptr fun = get_default_rsa_signature().dupctx;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx);
+	typedef void* (*fun_ptr)(void *vprsactx);
+	fun_ptr fun = get_default_rsa_signature().dupctx;
+
+	if (!fun)
+		return NULL;
+
+	printf("gzf %s\n", __func__);
+
+	return fun(vprsactx);
 }
 
 static int uadk_signature_rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
@@ -2178,6 +2233,7 @@ const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
 
 void uadk_prov_destroy_rsa(void)
 {
+	printf("gzf %s\n", __func__);
 	pthread_mutex_lock(&rsa_mutex);
 	if (g_rsa_prov.pid == getpid()) {
 		wd_rsa_uninit2();
