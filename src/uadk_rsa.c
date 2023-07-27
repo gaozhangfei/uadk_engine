@@ -818,6 +818,7 @@ static int uadk_e_rsa_init(void)
 	return UADK_E_INIT_SUCCESS;
 
 err_unlock:
+	g_rsa_res.ctx_res = NULL;
 	pthread_spin_unlock(&g_rsa_res.lock);
 	free(dev);
 	(void)fprintf(stderr, "failed to init rsa(%d)\n", ret);
@@ -828,7 +829,11 @@ err_unlock:
 static void uadk_e_rsa_uninit(void)
 {
 	struct wd_ctx_config *ctx_cfg = g_rsa_res.ctx_res;
-	int i, ret;
+	__u32 i;
+	int ret;
+
+	if (!ctx_cfg)
+		return;
 
 	if (g_rsa_res.pid == getpid()) {
 		ret = uadk_e_is_env_enabled("rsa");
@@ -1096,7 +1101,7 @@ static int rsa_do_crypto(struct uadk_rsa_sess *rsa_sess)
 	}
 	cb_param.op = &op;
 	cb_param.priv = &(rsa_sess->req);
-	rsa_sess->req.cb = (void *)uadk_e_rsa_cb;
+	rsa_sess->req.cb = uadk_e_rsa_cb;
 	rsa_sess->req.cb_param = &cb_param;
 	rsa_sess->req.status = -1;
 
@@ -1187,8 +1192,10 @@ static int rsa_fill_keygen_data(struct uadk_rsa_sess *rsa_sess,
 		return UADK_E_FAIL;
 
 	rsa_sess->req.dst = wd_rsa_new_kg_out(rsa_sess->sess);
-	if (!rsa_sess->req.dst)
+	if (!rsa_sess->req.dst) {
+		wd_rsa_del_kg_in(rsa_sess->sess, rsa_sess->req.src);
 		return UADK_E_FAIL;
+	}
 
 	return UADK_E_SUCCESS;
 }

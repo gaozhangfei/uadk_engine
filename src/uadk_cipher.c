@@ -47,7 +47,7 @@ struct cipher_engine {
 	pthread_spinlock_t lock;
 };
 
-static struct cipher_engine engine;
+static struct cipher_engine g_cipher_engine;
 
 struct sw_cipher_t {
 	int nid;
@@ -203,8 +203,8 @@ static struct cipher_info cipher_info_table[] = {
 
 static const EVP_CIPHER *sec_ciphers_get_cipher_sw_impl(int n_id)
 {
-	int sec_cipher_sw_table_size = ARRAY_SIZE(sec_ciphers_sw_table);
-	int i;
+	__u32 sec_cipher_sw_table_size = ARRAY_SIZE(sec_ciphers_sw_table);
+	__u32 i;
 
 	for (i = 0; i < sec_cipher_sw_table_size; i++) {
 		if (n_id == sec_ciphers_sw_table[i].nid)
@@ -348,10 +348,9 @@ static int uadk_get_accel_platform(char *alg_name)
 static int uadk_e_engine_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 				 const int **nids, int nid)
 {
-	int ret = 1;
 	int *cipher_nids;
-	int size;
-	int i;
+	__u32 size, i;
+	int ret = 1;
 
 	if (platform == HW_V2) {
 		size = (sizeof(cipher_hw_v2_nids) - 1) / sizeof(int);
@@ -563,41 +562,41 @@ static int uadk_e_wd_cipher_init(struct uacce_dev *dev)
 {
 	int ret, i, j;
 
-	engine.numa_id = dev->numa_id;
+	g_cipher_engine.numa_id = dev->numa_id;
 
 	ret = uadk_e_is_env_enabled("cipher");
 	if (ret == ENV_ENABLED)
 		return uadk_e_wd_cipher_env_init(dev);
 
-	memset(&engine.ctx_cfg, 0, sizeof(struct wd_ctx_config));
-	engine.ctx_cfg.ctx_num = CTX_NUM;
-	engine.ctx_cfg.ctxs = calloc(CTX_NUM, sizeof(struct wd_ctx));
-	if (!engine.ctx_cfg.ctxs)
+	memset(&g_cipher_engine.ctx_cfg, 0, sizeof(struct wd_ctx_config));
+	g_cipher_engine.ctx_cfg.ctx_num = CTX_NUM;
+	g_cipher_engine.ctx_cfg.ctxs = calloc(CTX_NUM, sizeof(struct wd_ctx));
+	if (!g_cipher_engine.ctx_cfg.ctxs)
 		return -ENOMEM;
 
 	for (i = 0; i < CTX_NUM; i++) {
-		engine.ctx_cfg.ctxs[i].ctx = wd_request_ctx(dev);
-		if (!engine.ctx_cfg.ctxs[i].ctx) {
+		g_cipher_engine.ctx_cfg.ctxs[i].ctx = wd_request_ctx(dev);
+		if (!g_cipher_engine.ctx_cfg.ctxs[i].ctx) {
 			ret = -ENOMEM;
 			goto err_freectx;
 		}
 	}
 
-	engine.ctx_cfg.ctxs[CTX_SYNC_ENC].op_type = CTX_TYPE_ENCRYPT;
-	engine.ctx_cfg.ctxs[CTX_SYNC_DEC].op_type = CTX_TYPE_DECRYPT;
-	engine.ctx_cfg.ctxs[CTX_ASYNC_ENC].op_type = CTX_TYPE_ENCRYPT;
-	engine.ctx_cfg.ctxs[CTX_ASYNC_DEC].op_type = CTX_TYPE_DECRYPT;
-	engine.ctx_cfg.ctxs[CTX_SYNC_ENC].ctx_mode = CTX_MODE_SYNC;
-	engine.ctx_cfg.ctxs[CTX_SYNC_DEC].ctx_mode = CTX_MODE_SYNC;
-	engine.ctx_cfg.ctxs[CTX_ASYNC_ENC].ctx_mode = CTX_MODE_ASYNC;
-	engine.ctx_cfg.ctxs[CTX_ASYNC_DEC].ctx_mode = CTX_MODE_ASYNC;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_SYNC_ENC].op_type = CTX_TYPE_ENCRYPT;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_SYNC_DEC].op_type = CTX_TYPE_DECRYPT;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_ASYNC_ENC].op_type = CTX_TYPE_ENCRYPT;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_ASYNC_DEC].op_type = CTX_TYPE_DECRYPT;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_SYNC_ENC].ctx_mode = CTX_MODE_SYNC;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_SYNC_DEC].ctx_mode = CTX_MODE_SYNC;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_ASYNC_ENC].ctx_mode = CTX_MODE_ASYNC;
+	g_cipher_engine.ctx_cfg.ctxs[CTX_ASYNC_DEC].ctx_mode = CTX_MODE_ASYNC;
 
-	engine.sched.name = "sched_single";
-	engine.sched.pick_next_ctx = sched_single_pick_next_ctx;
-	engine.sched.poll_policy = sched_single_poll_policy;
-	engine.sched.sched_init = sched_single_init;
+	g_cipher_engine.sched.name = "sched_single";
+	g_cipher_engine.sched.pick_next_ctx = sched_single_pick_next_ctx;
+	g_cipher_engine.sched.poll_policy = sched_single_poll_policy;
+	g_cipher_engine.sched.sched_init = sched_single_init;
 
-	ret = wd_cipher_init(&engine.ctx_cfg, &engine.sched);
+	ret = wd_cipher_init(&g_cipher_engine.ctx_cfg, &g_cipher_engine.sched);
 	if (ret)
 		goto err_freectx;
 
@@ -607,9 +606,9 @@ static int uadk_e_wd_cipher_init(struct uacce_dev *dev)
 
 err_freectx:
 	for (j = 0; j < i; j++)
-		wd_release_ctx(engine.ctx_cfg.ctxs[j].ctx);
+		wd_release_ctx(g_cipher_engine.ctx_cfg.ctxs[j].ctx);
 
-	free(engine.ctx_cfg.ctxs);
+	free(g_cipher_engine.ctx_cfg.ctxs);
 
 	return ret;
 }
@@ -619,16 +618,16 @@ static int uadk_e_init_cipher(void)
 	struct uacce_dev *dev;
 	int ret;
 
-	if (engine.pid != getpid()) {
-		pthread_spin_lock(&engine.lock);
-		if (engine.pid == getpid()) {
-			pthread_spin_unlock(&engine.lock);
+	if (g_cipher_engine.pid != getpid()) {
+		pthread_spin_lock(&g_cipher_engine.lock);
+		if (g_cipher_engine.pid == getpid()) {
+			pthread_spin_unlock(&g_cipher_engine.lock);
 			return 1;
 		}
 
 		dev = wd_get_accel_dev("cipher");
 		if (!dev) {
-			pthread_spin_unlock(&engine.lock);
+			pthread_spin_unlock(&g_cipher_engine.lock);
 			fprintf(stderr, "failed to get device for cipher.\n");
 			return 0;
 		}
@@ -637,15 +636,15 @@ static int uadk_e_init_cipher(void)
 		if (ret)
 			goto err_unlock;
 
-		engine.pid = getpid();
-		pthread_spin_unlock(&engine.lock);
+		g_cipher_engine.pid = getpid();
+		pthread_spin_unlock(&g_cipher_engine.lock);
 		free(dev);
 	}
 
 	return 1;
 
 err_unlock:
-	pthread_spin_unlock(&engine.lock);
+	pthread_spin_unlock(&g_cipher_engine.lock);
 	free(dev);
 	fprintf(stderr, "failed to init cipher(%d).\n", ret);
 
@@ -665,8 +664,9 @@ static int uadk_e_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 {
 	struct cipher_priv_ctx *priv =
 		(struct cipher_priv_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-	int cipher_counts = ARRAY_SIZE(cipher_info_table);
-	int nid, ret, i;
+	__u32 cipher_counts = ARRAY_SIZE(cipher_info_table);
+	int nid, ret;
+	__u32 i;
 
 	if (unlikely(!key)) {
 		fprintf(stderr, "ctx init parameter key is NULL.\n");
@@ -717,17 +717,17 @@ static int uadk_e_cipher_cleanup(EVP_CIPHER_CTX *ctx)
 	return 1;
 }
 
-static void async_cb(struct wd_cipher_req *req, void *data)
+static void *uadk_e_cipher_cb(struct wd_cipher_req *req, void *data)
 {
 	struct uadk_e_cb_info *cb_param;
 	struct async_op *op;
 
 	if (!req)
-		return;
+		return NULL;
 
 	cb_param = req->cb_param;
 	if (!cb_param)
-		return;
+		return NULL;
 
 	op = cb_param->op;
 	if (op && op->job && !op->done) {
@@ -735,6 +735,8 @@ static void async_cb(struct wd_cipher_req *req, void *data)
 		async_free_poll_task(op->idx, 1);
 		async_wake_job(op->job);
 	}
+
+	return NULL;
 }
 
 /* Increment counter (128-bit int) by c */
@@ -762,7 +764,7 @@ static void uadk_cipher_update_priv_ctx(struct cipher_priv_ctx *priv)
 	__u16 iv_bytes = priv->req.iv_bytes;
 	int offset = priv->req.in_bytes - iv_bytes;
 	unsigned char K[IV_LEN] = {0};
-	int i;
+	__u32 i;
 
 	switch (priv->setup.mode) {
 	case WD_CIPHER_CFB:
@@ -792,10 +794,16 @@ static int do_cipher_sync(struct cipher_priv_ctx *priv)
 {
 	int ret;
 
-	if (unlikely(priv->switch_flag == UADK_DO_SOFT))
+	if (unlikely(priv->switch_flag == UADK_DO_SOFT)) {
+		fprintf(stderr, "switch to soft cipher.\n");
 		return 0;
+	}
 
-	if (priv->switch_threshold >= priv->req.in_bytes)
+	/*
+	 * If the length of the input data does not reach to hardware computing threshold,
+	 * directly switch to soft cipher.
+	 */
+	if (priv->req.in_bytes <= priv->switch_threshold)
 		return 0;
 
 	ret = wd_do_cipher_sync(priv->sess, &priv->req);
@@ -810,14 +818,15 @@ static int do_cipher_async(struct cipher_priv_ctx *priv, struct async_op *op)
 	int idx, ret;
 
 	if (unlikely(priv->switch_flag == UADK_DO_SOFT)) {
-		fprintf(stderr, "async cipher init failed.\n");
+		fprintf(stderr, "switch to soft cipher.\n");
 		return 0;
 	}
 
 	cb_param.op = op;
 	cb_param.priv = priv;
-	priv->req.cb = (void *)async_cb;
+	priv->req.cb = uadk_e_cipher_cb;
 	priv->req.cb_param = &cb_param;
+
 	ret = async_get_free_task(&idx);
 	if (!ret)
 		return 0;
@@ -889,8 +898,10 @@ static void uadk_e_ctx_init(EVP_CIPHER_CTX *ctx, struct cipher_priv_ctx *priv)
 		}
 
 		priv->sess = wd_cipher_alloc_sess(&priv->setup);
-		if (!priv->sess)
+		if (!priv->sess) {
 			fprintf(stderr, "uadk failed to alloc session!\n");
+			return;
+		}
 	}
 
 	ret = wd_cipher_set_key(priv->sess, priv->key, EVP_CIPHER_CTX_key_length(ctx));
@@ -1150,22 +1161,23 @@ static void destroy_v3_cipher(void)
 
 void uadk_e_destroy_cipher(void)
 {
-	int i, ret;
+	__u32 i;
+	int ret;
 
-	if (engine.pid == getpid()) {
+	if (g_cipher_engine.pid == getpid()) {
 		ret = uadk_e_is_env_enabled("cipher");
 		if (ret == ENV_ENABLED) {
 			wd_cipher_env_uninit();
 		} else {
 			wd_cipher_uninit();
-			for (i = 0; i < engine.ctx_cfg.ctx_num; i++)
-				wd_release_ctx(engine.ctx_cfg.ctxs[i].ctx);
-			free(engine.ctx_cfg.ctxs);
+			for (i = 0; i < g_cipher_engine.ctx_cfg.ctx_num; i++)
+				wd_release_ctx(g_cipher_engine.ctx_cfg.ctxs[i].ctx);
+			free(g_cipher_engine.ctx_cfg.ctxs);
 		}
-		engine.pid = 0;
+		g_cipher_engine.pid = 0;
 	}
 
-	pthread_spin_destroy(&engine.lock);
+	pthread_spin_destroy(&g_cipher_engine.lock);
 
 	destroy_v2_cipher();
 	if (platform > HW_V2)
@@ -1174,5 +1186,5 @@ void uadk_e_destroy_cipher(void)
 
 void uadk_e_cipher_lock_init(void)
 {
-	pthread_spin_init(&engine.lock, PTHREAD_PROCESS_PRIVATE);
+	pthread_spin_init(&g_cipher_engine.lock, PTHREAD_PROCESS_PRIVATE);
 }
