@@ -53,6 +53,7 @@ extern const OSSL_DISPATCH uadk_des_ede3_ecb_functions[];
 
 extern const OSSL_DISPATCH uadk_rsa_signature_functions[];
 extern const OSSL_DISPATCH uadk_rsa_keymgmt_functions[];
+extern const OSSL_DISPATCH uadk_rsa_asym_cipher_functions[];
 
 void uadk_prov_destroy_digest(void);
 void uadk_prov_destroy_cipher(void);

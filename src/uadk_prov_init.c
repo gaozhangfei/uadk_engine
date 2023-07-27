@@ -81,10 +81,15 @@ static const OSSL_ALGORITHM uadk_prov_signature[] = {
 	{NULL, NULL, NULL}
 };
 
-static const OSSL_ALGORITHM uadk_keymgmt[] = {
+static const OSSL_ALGORITHM uadk_prov_keymgmt[] = {
 	{"RSA", UADK_DEFAULT_PROPERTIES,
-	 uadk_rsa_keymgmt_functions, "QAT RSA Keymgmt implementation."},
+	 uadk_rsa_keymgmt_functions, "uadk RSA Keymgmt implementation."},
 	{NULL, NULL, NULL}
+};
+
+static const OSSL_ALGORITHM uadk_prov_asym_cipher[] = {
+	{ "RSA", UADK_DEFAULT_PROPERTIES, uadk_rsa_asym_cipher_functions },
+	{ NULL, NULL, NULL }
 };
 
 static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
@@ -100,7 +105,9 @@ static const OSSL_ALGORITHM *p_prov_query(void *provctx, int operation_id,
 	case OSSL_OP_SIGNATURE:
 		return uadk_prov_signature;
 	case OSSL_OP_KEYMGMT:
-		return uadk_keymgmt;
+		return uadk_prov_keymgmt;
+	case OSSL_OP_ASYM_CIPHER:
+		return uadk_prov_asym_cipher;
 	}
 	return NULL;
 }
