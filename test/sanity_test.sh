@@ -14,7 +14,7 @@ if [[ $version =~ "3.0" ]]; then
 	fi
 
 	digest_algs=$(openssl list -provider $engine_id -digest-algorithms)
-	cipher_algs=$(openssl list -provider $engine_id -digest-algorithms)
+	cipher_algs=$(openssl list -provider $engine_id -cipher-algorithms)
 fi
 
 if [[ $digest_algs =~ "uadk_provider" ]]; then
