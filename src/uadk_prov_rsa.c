@@ -325,12 +325,40 @@ static int uadk_rsa_get_version(RSA *r)
 	return r->version;
 } 
 
-static void uadk_rsa_get0_factors(const RSA *r, const BIGNUM **p, const BIGNUM **q)
+static void uadk_rsa_get0_factors(const RSA *r, const BIGNUM **p,
+				  const BIGNUM **q)
 {
 	if (p != NULL)
 		*p = r->p;
 	if (q != NULL)
 		*q = r->q;
+}
+
+static void uadk_rsa_get0_key(const RSA *r, const BIGNUM **n,
+			      const BIGNUM **e, const BIGNUM **d)
+{
+	if (n != NULL)
+		*n = r->n;
+	if (e != NULL)
+		*e = r->e;
+	if (d != NULL)
+		*d = r->d;
+}
+
+static void uadk_rsa_get0_crt_params(const RSA *r, const BIGNUM **dmp1,
+				     const BIGNUM **dmq1, const BIGNUM **iqmp)
+{
+	if (dmp1 != NULL)
+		*dmp1 = r->dmp1;
+	if (dmq1 != NULL)
+		*dmq1 = r->dmq1;
+	if (iqmp != NULL)
+		*iqmp = r->iqmp;
+}
+
+static int uadk_rsa_bits(const RSA *r)
+{
+    return BN_num_bits(r->n);
 }
 
 static int uadk_rsa_size(const RSA *r)
@@ -604,8 +632,8 @@ static int check_rsa_is_crt(RSA *rsa)
 	if (version == RSA_ASN1_VERSION_MULTI)
 		return IS_SET;
 
-	RSA_get0_factors(rsa, &p, &q);
-	RSA_get0_crt_params(rsa, &dmp1, &dmq1, &iqmp);
+	uadk_rsa_get0_factors(rsa, &p, &q);
+	uadk_rsa_get0_crt_params(rsa, &dmp1, &dmq1, &iqmp);
 	if ((p != NULL) && (q != NULL) && (dmp1 != NULL) &&
 	    (dmq1 != NULL) && (iqmp != NULL))
 		return IS_SET;
@@ -820,7 +848,7 @@ static int check_rsa_input_para(const int flen, const unsigned char *from,
 		return UADK_E_FAIL;
 	}
 
-	return rsa_check_bit_useful(RSA_bits(rsa), flen);
+	return rsa_check_bit_useful(uadk_rsa_bits(rsa), flen);
 }
 
 static BN_ULONG *bn_get_words(const BIGNUM *a)
@@ -1362,7 +1390,7 @@ static void rsa_pkey_param_free(struct rsa_pubkey_param **pub,
 static int rsa_create_pub_bn_ctx(RSA *rsa, struct rsa_pubkey_param *pub,
 				 unsigned char **from_buf, int *num_bytes)
 {
-	RSA_get0_key(rsa, &pub->n, &pub->e, NULL);
+	uadk_rsa_get0_key(rsa, &pub->n, &pub->e, NULL);
 	if (!(pub->n) || !(pub->e))
 		return UADK_E_FAIL;
 
@@ -1385,15 +1413,15 @@ static void rsa_free_pub_bn_ctx(unsigned char **from_buf)
 static int rsa_create_pri_bn_ctx(RSA *rsa, struct rsa_prikey_param *pri,
 				 unsigned char **from_buf, int *num_bytes)
 {
-	RSA_get0_key(rsa, &pri->n, &pri->e, &pri->d);
+	uadk_rsa_get0_key(rsa, &pri->n, &pri->e, &pri->d);
 	if (!(pri->n) || !(pri->e) || !(pri->d))
 		return UADK_E_FAIL;
 
-	RSA_get0_factors(rsa, &pri->p, &pri->q);
+	uadk_rsa_get0_factors(rsa, &pri->p, &pri->q);
 	if (!(pri->p) || !(pri->q))
 		return UADK_E_FAIL;
 
-	RSA_get0_crt_params(rsa, &pri->dmp1, &pri->dmq1, &pri->iqmp);
+	uadk_rsa_get0_crt_params(rsa, &pri->dmp1, &pri->dmq1, &pri->iqmp);
 	if (!(pri->dmp1) || !(pri->dmq1) || !(pri->iqmp))
 		return UADK_E_FAIL;
 
@@ -1500,7 +1528,7 @@ static int uadk_e_rsa_public_encrypt(int flen, const unsigned char *from,
 
 	is_crt = check_rsa_is_crt(rsa);
 
-	rsa_sess = rsa_get_eng_session(rsa, RSA_bits(rsa), is_crt);
+	rsa_sess = rsa_get_eng_session(rsa, uadk_rsa_bits(rsa), is_crt);
 	if (!rsa_sess) {
 		ret = UADK_DO_SOFT;
 		goto free_pkey;
@@ -1576,7 +1604,7 @@ static int uadk_e_rsa_private_decrypt(int flen, const unsigned char *from,
 
 	pri->is_crt = check_rsa_is_crt(rsa);
 
-	rsa_sess = rsa_get_eng_session(rsa, RSA_bits(rsa), pri->is_crt);
+	rsa_sess = rsa_get_eng_session(rsa, uadk_rsa_bits(rsa), pri->is_crt);
 	if (!rsa_sess) {
 		ret = UADK_DO_SOFT;
 		goto free_pkey;
@@ -1656,7 +1684,7 @@ static int uadk_e_rsa_private_sign(int flen, const unsigned char *from,
 
 	pri->is_crt = check_rsa_is_crt(rsa);
 
-	rsa_sess = rsa_get_eng_session(rsa, RSA_bits(rsa), pri->is_crt);
+	rsa_sess = rsa_get_eng_session(rsa, uadk_rsa_bits(rsa), pri->is_crt);
 	if (!rsa_sess) {
 		ret = UADK_DO_SOFT;
 		goto free_pkey;
@@ -1746,7 +1774,7 @@ static int uadk_e_rsa_public_verify(int flen, const unsigned char *from,
 
 	is_crt = check_rsa_is_crt(rsa);
 
-	rsa_sess = rsa_get_eng_session(rsa, RSA_bits(rsa), is_crt);
+	rsa_sess = rsa_get_eng_session(rsa, uadk_rsa_bits(rsa), is_crt);
 	if (!rsa_sess) {
 		ret = UADK_DO_SOFT;
 		goto free_pkey;
