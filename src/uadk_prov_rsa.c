@@ -1843,19 +1843,20 @@ static RSA_METHOD *uadk_e_get_rsa_methods(void)
 
 static EVP_SIGNATURE get_default_rsa_signature()
 {
-    static EVP_SIGNATURE s_signature;
-    static int initilazed = 0;
-    if (!initilazed) {
-        EVP_SIGNATURE *signature = (EVP_SIGNATURE *)EVP_SIGNATURE_fetch(NULL, "RSA", "provider=default");
-        if (signature) {
-            s_signature = *signature;
-            EVP_SIGNATURE_free((EVP_SIGNATURE *)signature);
-            initilazed = 1;
-        } else {
-            fprintf(stderr, "EVP_SIGNATURE_fetch from default provider failed");
-        }
-    }
-    return s_signature;
+	static EVP_SIGNATURE s_signature;
+	static int initilazed = 0;
+	if (!initilazed) {
+		EVP_SIGNATURE *signature =
+			(EVP_SIGNATURE *)EVP_SIGNATURE_fetch(NULL, "RSA", "provider=default");
+		if (signature) {
+			s_signature = *signature;
+			EVP_SIGNATURE_free((EVP_SIGNATURE *)signature);
+			initilazed = 1;
+		} else {
+			fprintf(stderr, "EVP_SIGNATURE_fetch from default provider failed");
+		}
+	}
+	return s_signature;
 }
 
 static int uadk_rsa_init(void *vprsactx, void *vrsa,
@@ -1938,12 +1939,12 @@ static int uadk_rsa_verify(void *vprsactx, const unsigned char *sig,
 	return 1;
 }
 
-static size_t rsa_get_md_size(struct rsa_priv_ctx *priv)
+static size_t uadk_rsa_get_md_size(struct rsa_priv_ctx *priv)
 {
-    if (priv->md != NULL)
-        return EVP_MD_size(priv->md);
+	if (priv->md != NULL)
+		return EVP_MD_size(priv->md);
 
-    return 0;
+	return 0;
 }
 
 static int uadk_rsa_sign(void *vprsactx, unsigned char *sig,
@@ -1952,7 +1953,7 @@ static int uadk_rsa_sign(void *vprsactx, unsigned char *sig,
 {
 	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
 	size_t rsasize = uadk_rsa_size(priv->rsa);
-	size_t mdsize = rsa_get_md_size(priv);
+	size_t mdsize = uadk_rsa_get_md_size(priv);
 	int ret;
 
 	if (sig == NULL) {
@@ -2154,24 +2155,24 @@ int uadk_rsa_digest_verify_final(void *vprsactx, const unsigned char *sig,
                                  size_t siglen)
 {
 	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
-    unsigned char digest[EVP_MAX_MD_SIZE];
-    unsigned int dlen = 0;
+	unsigned char digest[EVP_MAX_MD_SIZE];
+	unsigned int dlen = 0;
 
-    if (priv == NULL)
-        return 0;
-    priv->flag_allow_md = 1;
-    if (priv->mdctx == NULL)
-        return 0;
+	if (priv == NULL)
+		return 0;
+	priv->flag_allow_md = 1;
+	if (priv->mdctx == NULL)
+		return 0;
 
-    /*
-     * The digests used here are all known (see rsa_get_md_nid()), so they
-     * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
-     */
-    if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
-        return 0;
+	/*
+	 * The digests used here are all known (see rsa_get_md_nid()), so they
+	 * should not exceed the internal buffer size of EVP_MAX_MD_SIZE.
+	 */
+	if (!EVP_DigestFinal_ex(priv->mdctx, digest, &dlen))
+		return 0;
 
-    return uadk_rsa_verify(vprsactx, sig, siglen,
-                                    digest, (size_t)dlen);
+	return uadk_rsa_verify(vprsactx, sig, siglen,
+			digest, (size_t)dlen);
 }
 
 
@@ -2190,65 +2191,65 @@ static void *uadk_rsa_dupctx(void *vprsactx)
 
 static int uadk_rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
 {
-    typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
-    fun_ptr fun = get_default_rsa_signature().get_ctx_params;
-    if (!fun)
-        return 0;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx, params);
+	typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
+	fun_ptr fun = get_default_rsa_signature().get_ctx_params;
+	if (!fun)
+		return 0;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx, params);
 }
 
 static const OSSL_PARAM *uadk_rsa_gettable_ctx_md_params(void *vprsactx)
 {
-    typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
-    fun_ptr fun = get_default_rsa_signature().gettable_ctx_md_params;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx);
+	typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
+	fun_ptr fun = get_default_rsa_signature().gettable_ctx_md_params;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx);
 }
 
 
 static int uadk_rsa_set_ctx_md_params(void *vprsactx, const OSSL_PARAM params[])
 {
-    typedef int (*fun_ptr)(void *vprsactx, const OSSL_PARAM params[]);
-    fun_ptr fun = get_default_rsa_signature().set_ctx_md_params;
-    if (!fun)
-        return 0;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx, params);
+	typedef int (*fun_ptr)(void *vprsactx, const OSSL_PARAM params[]);
+	fun_ptr fun = get_default_rsa_signature().set_ctx_md_params;
+	if (!fun)
+		return 0;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx, params);
 }
 
 static const OSSL_PARAM *uadk_rsa_settable_ctx_md_params(void *vprsactx)
 {
-    typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
-    fun_ptr fun = get_default_rsa_signature().settable_ctx_md_params;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx);
+	typedef const OSSL_PARAM * (*fun_ptr)(void *vprsactx);
+	fun_ptr fun = get_default_rsa_signature().settable_ctx_md_params;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx);
 }
 
 static const OSSL_PARAM *uadk_rsa_gettable_ctx_params(ossl_unused void *vprsactx,
                                                  ossl_unused void *provctx)
 {
-    typedef const OSSL_PARAM * (*fun_ptr)(ossl_unused void *vprsactx,
-                                          ossl_unused void *provctx);
-    fun_ptr fun = get_default_rsa_signature().gettable_ctx_params;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx, provctx);
+	typedef const OSSL_PARAM * (*fun_ptr)(ossl_unused void *vprsactx,
+					      ossl_unused void *provctx);
+	fun_ptr fun = get_default_rsa_signature().gettable_ctx_params;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx, provctx);
 }
 
 static int uadk_rsa_get_ctx_md_params(void *vprsactx, OSSL_PARAM *params)
 {
-    typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
-    fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
-    if (!fun)
-        return 0;
-    printf("gzf %s\n", __func__);
-    return fun(vprsactx, params);
+	typedef int (*fun_ptr)(void *vprsactx, OSSL_PARAM *params);
+	fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
+	if (!fun)
+		return 0;
+	printf("gzf %s\n", __func__);
+	return fun(vprsactx, params);
 }
 
 static int uadk_rsa_encrypt_init(void *vprsactx, void *vrsa,
@@ -2320,6 +2321,225 @@ static int uadk_rsa_decrypt(void *vprsactx, unsigned char *out, size_t *outlen,
 
 	return 1;
 }
+
+UADK_RSA_KEYMGMT get_default_keymgmt()
+{
+	static UADK_RSA_KEYMGMT s_keymgmt;
+	static int initialized = 0;
+	if (!initialized) {
+		UADK_RSA_KEYMGMT *keymgmt =
+			(UADK_RSA_KEYMGMT *)EVP_KEYMGMT_fetch(NULL, "RSA", "provider=default");
+		if (keymgmt) {
+			s_keymgmt = *keymgmt;
+			EVP_KEYMGMT_free((EVP_KEYMGMT *)keymgmt);
+			initialized = 1;
+		} else {
+			fprintf(stderr, "EVP_KEYMGMT_fetch from default provider failed");
+		}
+	}
+	return s_keymgmt;
+}
+
+static void *uadk_keymgmt_rsa_newdata(void *provctx)
+{
+	typedef void* (*fun_ptr)(void *);
+	fun_ptr fun = get_default_keymgmt().new;
+	if (!fun)
+		return NULL;
+	return fun(provctx);
+}
+
+static void uadk_keymgmt_rsa_freedata(void *keydata)
+{
+	typedef void (*fun_ptr)(void *);
+	fun_ptr fun = get_default_keymgmt().free;
+	if (!fun)
+		return;
+	printf("gzf %s\n", __func__);
+	fun(keydata);
+}
+
+static int uadk_keymgmt_rsa_has(const void *keydata, int selection)
+{
+	typedef int (*fun_ptr)(const void *,int);
+	fun_ptr fun = get_default_keymgmt().has;
+	if (!fun)
+		return 0;
+
+	printf("gzf %s\n", __func__);
+	return fun(keydata,selection);
+}
+
+static int uadk_keymgmt_rsa_import(void *keydata, int selection, const OSSL_PARAM params[])
+{
+	typedef int (*fun_ptr)(void *, int, const OSSL_PARAM*);
+	fun_ptr fun = get_default_keymgmt().import;
+	if (!fun)
+		return 0;
+	printf("gzf %s\n", __func__);
+	return fun(keydata,selection,params);
+}
+
+static const OSSL_PARAM *uadk_keymgmt_rsa_import_types(int selection)
+{
+	typedef const OSSL_PARAM* (*fun_ptr)(int);
+	fun_ptr fun = get_default_keymgmt().import_types;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(selection);
+}
+
+static void *uadk_keymgmt_rsa_gen_init(void *provctx, int selection,
+                          const OSSL_PARAM params[])
+{
+	typedef void * (*fun_ptr)(void *, int, const OSSL_PARAM *);
+	fun_ptr fun = get_default_keymgmt().gen_init;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(provctx, selection, params);
+}
+
+static int uadk_keymgmt_rsa_gen_set_params(void *genctx, const OSSL_PARAM params[])
+{
+	typedef int (*fun_ptr)(void *, const OSSL_PARAM *);
+	fun_ptr fun = get_default_keymgmt().gen_set_params;
+	if (!fun)
+		return 0;
+	return fun(genctx, params);
+}
+
+static const OSSL_PARAM *uadk_keymgmt_rsa_gen_settable_params(ossl_unused void *genctx,
+                                                 ossl_unused void *provctx)
+{
+	typedef const OSSL_PARAM * (*fun_ptr)(void *, void *);
+	fun_ptr fun = get_default_keymgmt().gen_settable_params;
+	if (!fun)
+		return NULL;
+	return fun(genctx, provctx);
+}
+
+static void *uadk_keymgmt_rsa_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
+{
+	typedef void * (*fun_ptr)(void *, OSSL_CALLBACK *, void *);
+	fun_ptr fun = get_default_keymgmt().gen;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(genctx, osslcb, cbarg);
+}
+
+static void uadk_keymgmt_rsa_gen_cleanup(void *genctx)
+{
+	typedef void (*fun_ptr)(void *);
+	fun_ptr fun = get_default_keymgmt().gen_cleanup;
+	if (!fun)
+		return;
+	printf("gzf %s\n", __func__);
+	fun(genctx);
+}
+
+static void *uadk_keymgmt_rsa_load(const void *reference, size_t reference_sz)
+{
+	typedef void * (*fun_ptr)(const void *, size_t);
+	fun_ptr fun = get_default_keymgmt().load;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(reference, reference_sz);
+}
+
+static int uadk_keymgmt_rsa_get_params(void *key, OSSL_PARAM params[])
+{
+	typedef int (*fun_ptr)(void *, OSSL_PARAM *);
+	fun_ptr fun = get_default_keymgmt().get_params;
+	if (!fun)
+		return 0;
+	return fun(key, params);
+}
+
+static const OSSL_PARAM *uadk_keymgmt_rsa_gettable_params(void *provctx)
+{
+	typedef const OSSL_PARAM * (*fun_ptr)(void *);
+	fun_ptr fun = get_default_keymgmt().gettable_params;
+	if (!fun)
+		return NULL;
+	return fun(provctx);
+}
+
+static int uadk_keymgmt_rsa_match(const void *keydata1, const void *keydata2, int selection)
+{
+	typedef int (*fun_ptr)(const void *, const void *, int);
+	fun_ptr fun = get_default_keymgmt().match;
+	if (!fun)
+		return 0;
+	return fun(keydata1, keydata2, selection);
+}
+
+static int uadk_keymgmt_rsa_validate(const void *keydata, int selection, int checktype)
+{
+	typedef int (*fun_ptr)(const void *, int, int);
+	fun_ptr fun = get_default_keymgmt().validate;
+	if (!fun)
+		return 0;
+	return fun(keydata, selection, checktype);
+}
+
+static int uadk_keymgmt_rsa_export(void *keydata, int selection,
+                      OSSL_CALLBACK *param_callback, void *cbarg)
+{
+	typedef int (*fun_ptr)(void *, int, OSSL_CALLBACK *, void *);
+	fun_ptr fun = get_default_keymgmt().export;
+	if (!fun)
+		return 0;
+	return fun(keydata, selection, param_callback, cbarg);
+}
+
+static const OSSL_PARAM *uadk_keymgmt_rsa_export_types(int selection)
+{
+	typedef const OSSL_PARAM * (*fun_ptr)(int);
+	fun_ptr fun = get_default_keymgmt().export_types;
+	if (!fun)
+		return NULL;
+	return fun(selection);
+}
+
+static void *uadk_keymgmt_rsa_dup(const void *keydata_from, int selection)
+{
+	typedef void * (*fun_ptr)(const void *, int);
+	fun_ptr fun = get_default_keymgmt().dup;
+	if (!fun)
+		return NULL;
+	printf("gzf %s\n", __func__);
+	return fun(keydata_from, selection);
+}
+
+const OSSL_DISPATCH uadk_rsa_keymgmt_functions[] = {
+	{ OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))uadk_keymgmt_rsa_newdata },
+	{ OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))uadk_keymgmt_rsa_freedata },
+	{ OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))uadk_keymgmt_rsa_has },
+	{ OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))uadk_keymgmt_rsa_import },
+	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES,
+		(void (*)(void))uadk_keymgmt_rsa_import_types },
+	{ OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))uadk_keymgmt_rsa_gen_init },
+	{ OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+		(void (*)(void))uadk_keymgmt_rsa_gen_set_params },
+	{ OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+		(void (*)(void))uadk_keymgmt_rsa_gen_settable_params },
+	{ OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))uadk_keymgmt_rsa_gen },
+	{ OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))uadk_keymgmt_rsa_gen_cleanup },
+	{ OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))uadk_keymgmt_rsa_load },
+	{ OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*) (void))uadk_keymgmt_rsa_get_params },
+	{ OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS,
+		(void (*) (void))uadk_keymgmt_rsa_gettable_params },
+	{ OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))uadk_keymgmt_rsa_match },
+	{ OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))uadk_keymgmt_rsa_validate },
+	{ OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))uadk_keymgmt_rsa_export },
+	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))uadk_keymgmt_rsa_export_types },
+	{ OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))uadk_keymgmt_rsa_dup },
+	{0, NULL}
+};
 
 const OSSL_DISPATCH uadk_rsa_signature_functions[] = {
 	{OSSL_FUNC_SIGNATURE_NEWCTX,
@@ -2406,219 +2626,3 @@ void uadk_prov_destroy_rsa(void)
 	}
 	pthread_mutex_unlock(&rsa_mutex);
 }
-
-UADK_RSA_KEYMGMT get_default_keymgmt()
-{
-    static UADK_RSA_KEYMGMT s_keymgmt;
-    static int initialized = 0;
-    if (!initialized) {
-        UADK_RSA_KEYMGMT *keymgmt = (UADK_RSA_KEYMGMT *)EVP_KEYMGMT_fetch(NULL, "RSA", "provider=default");
-        if (keymgmt) {
-            s_keymgmt = *keymgmt;
-            EVP_KEYMGMT_free((EVP_KEYMGMT *)keymgmt);
-            initialized = 1;
-        } else {
-            fprintf(stderr, "EVP_KEYMGMT_fetch from default provider failed");
-        }
-    }
-    return s_keymgmt;
-}
-
-static void *uadk_keymgmt_rsa_newdata(void *provctx)
-{
-    typedef void* (*fun_ptr)(void *);
-    fun_ptr fun = get_default_keymgmt().new;
-    if (!fun)
-        return NULL;
-    return fun(provctx);
-}
-
-static void uadk_keymgmt_rsa_freedata(void *keydata)
-{
-    typedef void (*fun_ptr)(void *);
-    fun_ptr fun = get_default_keymgmt().free;
-    if (!fun)
-        return;
-    printf("gzf %s\n", __func__);
-    fun(keydata);
-}
-
-static int uadk_keymgmt_rsa_has(const void *keydata, int selection)
-{
-    typedef int (*fun_ptr)(const void *,int);
-    fun_ptr fun = get_default_keymgmt().has;
-    if (!fun)
-        return 0;
-
-    printf("gzf %s\n", __func__);
-    return fun(keydata,selection);
-}
-
-static int uadk_keymgmt_rsa_import(void *keydata, int selection, const OSSL_PARAM params[])
-{
-    typedef int (*fun_ptr)(void *, int, const OSSL_PARAM*);
-    fun_ptr fun = get_default_keymgmt().import;
-    if (!fun)
-        return 0;
-    printf("gzf %s\n", __func__);
-    return fun(keydata,selection,params);
-}
-
-static const OSSL_PARAM *uadk_keymgmt_rsa_import_types(int selection)
-{
-    typedef const OSSL_PARAM* (*fun_ptr)(int);
-    fun_ptr fun = get_default_keymgmt().import_types;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(selection);
-}
-
-static void *uadk_keymgmt_rsa_gen_init(void *provctx, int selection,
-                          const OSSL_PARAM params[])
-{
-    typedef void * (*fun_ptr)(void *, int, const OSSL_PARAM *);
-    fun_ptr fun = get_default_keymgmt().gen_init;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(provctx, selection, params);
-}
-
-static int uadk_keymgmt_rsa_gen_set_params(void *genctx, const OSSL_PARAM params[])
-{
-    typedef int (*fun_ptr)(void *, const OSSL_PARAM *);
-    fun_ptr fun = get_default_keymgmt().gen_set_params;
-    if (!fun)
-        return 0;
-    return fun(genctx, params);
-}
-
-static const OSSL_PARAM *uadk_keymgmt_rsa_gen_settable_params(ossl_unused void *genctx,
-                                                 ossl_unused void *provctx)
-{
-    typedef const OSSL_PARAM * (*fun_ptr)(void *, void *);
-    fun_ptr fun = get_default_keymgmt().gen_settable_params;
-    if (!fun)
-        return NULL;
-    return fun(genctx, provctx);
-}
-
-static void *uadk_keymgmt_rsa_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
-{
-    typedef void * (*fun_ptr)(void *, OSSL_CALLBACK *, void *);
-    fun_ptr fun = get_default_keymgmt().gen;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(genctx, osslcb, cbarg);
-}
-
-static void uadk_keymgmt_rsa_gen_cleanup(void *genctx)
-{
-    typedef void (*fun_ptr)(void *);
-    fun_ptr fun = get_default_keymgmt().gen_cleanup;
-    if (!fun)
-        return;
-    printf("gzf %s\n", __func__);
-    fun(genctx);
-}
-
-static void *uadk_keymgmt_rsa_load(const void *reference, size_t reference_sz)
-{
-    typedef void * (*fun_ptr)(const void *, size_t);
-    fun_ptr fun = get_default_keymgmt().load;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(reference, reference_sz);
-}
-
-static int uadk_keymgmt_rsa_get_params(void *key, OSSL_PARAM params[])
-{
-    typedef int (*fun_ptr)(void *, OSSL_PARAM *);
-    fun_ptr fun = get_default_keymgmt().get_params;
-    if (!fun)
-        return 0;
-    return fun(key, params);
-}
-
-static const OSSL_PARAM *uadk_keymgmt_rsa_gettable_params(void *provctx)
-{
-    typedef const OSSL_PARAM * (*fun_ptr)(void *);
-    fun_ptr fun = get_default_keymgmt().gettable_params;
-    if (!fun)
-        return NULL;
-    return fun(provctx);
-}
-
-static int uadk_keymgmt_rsa_match(const void *keydata1, const void *keydata2, int selection)
-{
-    typedef int (*fun_ptr)(const void *, const void *, int);
-    fun_ptr fun = get_default_keymgmt().match;
-    if (!fun)
-        return 0;
-    return fun(keydata1, keydata2, selection);
-}
-
-static int uadk_keymgmt_rsa_validate(const void *keydata, int selection, int checktype)
-{
-    typedef int (*fun_ptr)(const void *, int, int);
-    fun_ptr fun = get_default_keymgmt().validate;
-    if (!fun)
-        return 0;
-    return fun(keydata, selection, checktype);
-}
-
-static int uadk_keymgmt_rsa_export(void *keydata, int selection,
-                      OSSL_CALLBACK *param_callback, void *cbarg)
-{
-    typedef int (*fun_ptr)(void *, int, OSSL_CALLBACK *, void *);
-    fun_ptr fun = get_default_keymgmt().export;
-    if (!fun)
-        return 0;
-    return fun(keydata, selection, param_callback, cbarg);
-}
-
-static const OSSL_PARAM *uadk_keymgmt_rsa_export_types(int selection)
-{
-    typedef const OSSL_PARAM * (*fun_ptr)(int);
-    fun_ptr fun = get_default_keymgmt().export_types;
-    if (!fun)
-        return NULL;
-    return fun(selection);
-}
-
-static void *uadk_keymgmt_rsa_dup(const void *keydata_from, int selection)
-{
-    typedef void * (*fun_ptr)(const void *, int);
-    fun_ptr fun = get_default_keymgmt().dup;
-    if (!fun)
-        return NULL;
-    printf("gzf %s\n", __func__);
-    return fun(keydata_from, selection);
-}
-
-const OSSL_DISPATCH uadk_rsa_keymgmt_functions[] = {
-    {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))uadk_keymgmt_rsa_newdata},
-    {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))uadk_keymgmt_rsa_freedata},
-    {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))uadk_keymgmt_rsa_has},
-    {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))uadk_keymgmt_rsa_import},
-    {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))uadk_keymgmt_rsa_import_types},
-    { OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))uadk_keymgmt_rsa_gen_init },
-    { OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
-      (void (*)(void))uadk_keymgmt_rsa_gen_set_params },
-    { OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
-      (void (*)(void))uadk_keymgmt_rsa_gen_settable_params },
-    { OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))uadk_keymgmt_rsa_gen },
-    { OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))uadk_keymgmt_rsa_gen_cleanup },
-    { OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))uadk_keymgmt_rsa_load },
-    { OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*) (void))uadk_keymgmt_rsa_get_params },
-    { OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*) (void))uadk_keymgmt_rsa_gettable_params },
-    { OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))uadk_keymgmt_rsa_match },
-    { OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))uadk_keymgmt_rsa_validate },
-    { OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))uadk_keymgmt_rsa_export },
-    { OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))uadk_keymgmt_rsa_export_types },
-    { OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))uadk_keymgmt_rsa_dup },
-    {0, NULL}
-};
