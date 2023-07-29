@@ -136,7 +136,7 @@ static struct rsa_prov g_rsa_prov;
 
 static pthread_mutex_t rsa_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct rsa_priv_ctx {
+typedef struct {
 	OSSL_LIB_CTX *libctx;
 	char *propq;
 	RSA *rsa;
@@ -172,7 +172,7 @@ struct rsa_priv_ctx {
 	unsigned char *tbuf;
 
 	unsigned int soft : 1;
-};
+} PROV_RSA_SIG_CTX;
 
 struct rsa_st{
 	/*
@@ -341,8 +341,8 @@ typedef struct {
 	unsigned int client_version;
 	unsigned int alt_version;
 
-	int soft;
-} PROV_RSA_CTX;
+	unsigned int soft : 1;
+} PROV_RSA_ASYM_CTX;
 
 enum {
 	INVALID = 0,
@@ -487,7 +487,7 @@ static int uadk_rsa_size(const RSA *r)
 	return BN_num_bytes(r->n);
 }
 
-static int setup_tbuf(struct rsa_priv_ctx *ctx)
+static int setup_tbuf(PROV_RSA_SIG_CTX *ctx)
 {
 	if (ctx->tbuf != NULL)
 		return 1;
@@ -500,13 +500,13 @@ static int setup_tbuf(struct rsa_priv_ctx *ctx)
 	return 1;
 }
 
-static void clean_tbuf(struct rsa_priv_ctx *ctx)
+static void clean_tbuf(PROV_RSA_SIG_CTX *ctx)
 {
 	if (ctx->tbuf != NULL)
 		OPENSSL_cleanse(ctx->tbuf, uadk_rsa_size(ctx->rsa));
 }
 
-static void free_tbuf(struct rsa_priv_ctx *ctx)
+static void free_tbuf(PROV_RSA_SIG_CTX *ctx)
 {
 	clean_tbuf(ctx);
 	OPENSSL_free(ctx->tbuf);
@@ -2008,7 +2008,7 @@ static EVP_ASYM_CIPHER get_default_asym_cipher()
 static int uadk_rsa_asym_init(void *vprsactx, void *vrsa,
 			      const OSSL_PARAM params[], int operation)
 {
-	PROV_RSA_CTX *priv = (PROV_RSA_CTX *)vprsactx;
+	PROV_RSA_ASYM_CTX *priv = (PROV_RSA_ASYM_CTX *)vprsactx;
 
 	priv->rsa = vrsa;
 	priv->operation = operation;
@@ -2034,7 +2034,7 @@ static int uadk_rsa_asym_init(void *vprsactx, void *vrsa,
 static int uadk_rsa_init(void *vprsactx, void *vrsa,
 			 const OSSL_PARAM params[], int operation)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 
 	if (priv == NULL || vrsa == NULL)
 		return 0;
@@ -2093,7 +2093,7 @@ static int uadk_rsa_verify(void *vprsactx, const unsigned char *sig,
 	typedef int (*fun_ptr)(void *vprsactx, const unsigned char *sig,
 			       size_t siglen, const unsigned char *tbs,
 			       size_t tbslen);
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 	size_t rslen = 0;
 
 	if (priv->soft)
@@ -2125,7 +2125,7 @@ soft:
 	return fun(vprsactx, sig, siglen, tbs, tbslen);
 }
 
-static size_t uadk_rsa_get_md_size(struct rsa_priv_ctx *priv)
+static size_t uadk_rsa_get_md_size(PROV_RSA_SIG_CTX *priv)
 {
 	if (priv->md != NULL)
 		return EVP_MD_size(priv->md);
@@ -2140,7 +2140,7 @@ static int uadk_rsa_sign(void *vprsactx, unsigned char *sig,
 	typedef int (*fun_ptr)(void *vprsactx, unsigned char *sig,
 			       size_t *siglen, size_t sigsize,
 			       const unsigned char *tbs, size_t tbslen);
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 	size_t rsasize = uadk_rsa_size(priv->rsa);
 	size_t mdsize = uadk_rsa_get_md_size(priv);
 	int ret;
@@ -2188,10 +2188,10 @@ static int uadk_rsa_sign_init(void *vprsactx, void *vrsa, const OSSL_PARAM param
 
 static void *uadk_rsa_signature_newctx(void *provctx, const char *propq)
 {
-	struct rsa_priv_ctx *priv = NULL;
+	PROV_RSA_SIG_CTX *priv = NULL;
 	char *propq_copy = NULL;
 
-	if ((priv = OPENSSL_zalloc(sizeof(struct rsa_priv_ctx))) == NULL ||
+	if ((priv = OPENSSL_zalloc(sizeof(PROV_RSA_SIG_CTX))) == NULL ||
 	    (propq != NULL && (propq_copy = OPENSSL_strdup(propq)) == NULL)) {
 		OPENSSL_free(priv);
 		fprintf(stderr, "uadk_rsa_signature_newctx failed.\n");
@@ -2206,7 +2206,7 @@ static void *uadk_rsa_signature_newctx(void *provctx, const char *propq)
 
 static void uadk_rsa_signature_freectx(void *vprsactx)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 
 	if (priv == NULL)
 		return;
@@ -2219,7 +2219,7 @@ static void uadk_rsa_signature_freectx(void *vprsactx)
 
 static void *uadk_rsa_asym_newctx(void *provctx)
 {
-	PROV_RSA_CTX *priv = NULL;
+	PROV_RSA_ASYM_CTX *priv = NULL;
 
 	priv = OPENSSL_zalloc(sizeof(*priv));
 	if (priv == NULL)
@@ -2231,7 +2231,7 @@ static void *uadk_rsa_asym_newctx(void *provctx)
 
 static void uadk_rsa_asym_freectx(void *vprsactx)
 {
-	PROV_RSA_CTX *priv = (PROV_RSA_CTX *)vprsactx;
+	PROV_RSA_ASYM_CTX *priv = (PROV_RSA_ASYM_CTX *)vprsactx;
 
 	if (priv == NULL)
 		return;
@@ -2241,7 +2241,7 @@ static void uadk_rsa_asym_freectx(void *vprsactx)
 
 static int uadk_rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 
 	if (priv == NULL)
 		return 0;
@@ -2276,7 +2276,7 @@ static const OSSL_PARAM
 *uadk_rsa_settable_ctx_params(void *vprsactx,
 					ossl_unused void *provctx)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 
 	if (priv != NULL && !priv->flag_allow_md)
 		return settable_ctx_params_no_digest;
@@ -2302,7 +2302,7 @@ static int uadk_rsa_digest_signverify_update(void *vprsactx,
 					     const unsigned char *data,
 					     size_t datalen)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 
 	if (priv == NULL || priv->mdctx == NULL)
 		return 0;
@@ -2313,7 +2313,7 @@ static int uadk_rsa_digest_signverify_update(void *vprsactx,
 static int uadk_rsa_digest_sign_final(void *vprsactx, unsigned char *sig,
 				      size_t *siglen, size_t sigsize)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 	unsigned char digest[EVP_MAX_MD_SIZE];
 	unsigned int dlen = 0;
 
@@ -2357,7 +2357,7 @@ static int uadk_rsa_digest_verify_init(void *vprsactx, const char *mdname,
 int uadk_rsa_digest_verify_final(void *vprsactx, const unsigned char *sig,
                                  size_t siglen)
 {
-	struct rsa_priv_ctx *priv = (struct rsa_priv_ctx *)vprsactx;
+	PROV_RSA_SIG_CTX *priv = (PROV_RSA_SIG_CTX *)vprsactx;
 	unsigned char digest[EVP_MAX_MD_SIZE];
 	unsigned int dlen = 0;
 
@@ -2441,7 +2441,7 @@ static const OSSL_PARAM *uadk_rsa_gettable_ctx_params(ossl_unused void *vprsactx
 	fun_ptr fun = get_default_rsa_signature().gettable_ctx_params;
 	if (!fun)
 		return NULL;
-	printf("gzf %s\n", __func__);
+
 	return fun(vprsactx, provctx);
 }
 
@@ -2451,7 +2451,7 @@ static int uadk_rsa_get_ctx_md_params(void *vprsactx, OSSL_PARAM *params)
 	fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
 	if (!fun)
 		return 0;
-	printf("gzf %s\n", __func__);
+
 	return fun(vprsactx, params);
 }
 
@@ -2464,16 +2464,16 @@ static int uadk_rsa_asym_encrypt_init(void *vprsactx, void *vrsa,
 static int uadk_rsa_asym_decrypt_init(void *vprsactx, void *vrsa,
                             const OSSL_PARAM params[])
 {
-	printf("gzf %s\n", __func__);
 	return uadk_rsa_asym_init(vprsactx, vrsa, params, EVP_PKEY_OP_DECRYPT);
 }
 
-static int uadk_rsa_encrypt(void *vprsactx, unsigned char *out, size_t *outlen,
-			    size_t outsize, const unsigned char *in, size_t inlen)
+static int uadk_rsa_asym_encrypt(void *vprsactx, unsigned char *out,
+				 size_t *outlen, size_t outsize,
+				 const unsigned char *in, size_t inlen)
 {
 	typedef int (*fun_ptr)(void *vprsactx, unsigned char *out, size_t *outlen,
 			    size_t outsize, const unsigned char *in, size_t inlen);
-	PROV_RSA_CTX *priv = (PROV_RSA_CTX *)vprsactx;
+	PROV_RSA_ASYM_CTX *priv = (PROV_RSA_ASYM_CTX *)vprsactx;
 	int ret;
 
 	if (priv->soft)
@@ -2508,12 +2508,13 @@ soft:
 	return fun(vprsactx, out, outlen, outsize, in, inlen);
 }
 
-static int uadk_rsa_decrypt(void *vprsactx, unsigned char *out, size_t *outlen,
-			    size_t outsize, const unsigned char *in, size_t inlen)
+static int uadk_rsa_asym_decrypt(void *vprsactx, unsigned char *out,
+				 size_t *outlen, size_t outsize,
+				 const unsigned char *in, size_t inlen)
 {
 	typedef int (*fun_ptr)(void *vprsactx, unsigned char *out, size_t *outlen,
 			       size_t outsize, const unsigned char *in, size_t inlen);
-	PROV_RSA_CTX *priv = (PROV_RSA_CTX *)vprsactx;
+	PROV_RSA_ASYM_CTX *priv = (PROV_RSA_ASYM_CTX *)vprsactx;
 	size_t len = uadk_rsa_size(priv->rsa);
 	int ret;
 
@@ -2836,11 +2837,11 @@ const OSSL_DISPATCH uadk_rsa_asym_cipher_functions[] = {
 	{ OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT,
 		(void (*)(void))uadk_rsa_asym_encrypt_init },
 	{ OSSL_FUNC_ASYM_CIPHER_ENCRYPT,
-		(void (*)(void))uadk_rsa_encrypt },
+		(void (*)(void))uadk_rsa_asym_encrypt },
 	{ OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT,
 		(void (*)(void))uadk_rsa_asym_decrypt_init },
 	{ OSSL_FUNC_ASYM_CIPHER_DECRYPT,
-		(void (*)(void))uadk_rsa_decrypt },
+		(void (*)(void))uadk_rsa_asym_decrypt },
 	{ OSSL_FUNC_ASYM_CIPHER_FREECTX,
 		(void (*)(void))uadk_rsa_asym_freectx },
 	{ 0, NULL }
