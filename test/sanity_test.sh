@@ -1,7 +1,10 @@
 #!/bin/bash
 
+set -x
 sudo chmod 666 /dev/hisi_*
 
+TEST_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+UADK_PROVIDER_FULLPATH="$TEST_SCRIPT_DIR/../src/.libs/uadk_provider.so"
 
 version=$(openssl version)
 echo $version
@@ -13,12 +16,12 @@ echo "OpenSSL major version is "$major_version
 # Check if the major version is equal to or greater than 3
 if ((major_version >= 3)); then
 	if [ ! -n "$1" ]; then
-		engine_id=uadk_provider
+		engine_id=$UADK_PROVIDER_FULLPATH
 	else
 		engine_id=$1
 	fi
 	digest_algs=$(openssl list -provider $engine_id -digest-algorithms)
-	cipher_algs=$(openssl list -provider $engine_id -digest-algorithms)
+	cipher_algs=$(openssl list -provider $engine_id -cipher-algorithms)
 fi
 
 if [[ $digest_algs =~ "uadk_provider" ]]; then
