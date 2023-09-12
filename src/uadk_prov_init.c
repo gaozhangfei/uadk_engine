@@ -80,6 +80,8 @@ const OSSL_ALGORITHM uadk_prov_ciphers[] = {
 	  uadk_des_ede3_cbc_functions, "uadk_provider des-ede3-cbc" },
 	{ "DES-EDE3-ECB", UADK_DEFAULT_PROPERTIES,
 	  uadk_des_ede3_ecb_functions, "uadk_provider des-ede3-ecb" },
+	{ "SM4-CTR", UADK_DEFAULT_PROPERTIES,
+	  uadk_sm4_ctr_functions, "uadk_provider sm4-ctr" },
 	{ NULL, NULL, NULL }
 };
 
@@ -145,6 +147,7 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
 	if (ctx == NULL)
 		return 0;
 
+	ctx->handle = handle;
 	ret = async_module_init();
 	if (!ret)
 		fprintf(stderr, "async_module_init fail!\n");
