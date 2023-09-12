@@ -1024,7 +1024,7 @@ static const OSSL_PARAM uadk_prov_default_ctx_params[] = {
 	OSSL_PARAM_END
 };
 
-const OSSL_PARAM *uadk_prov_cipher_gettable_ctx_params(ossl_unused void *cctx,
+static const OSSL_PARAM *uadk_prov_cipher_gettable_ctx_params(ossl_unused void *cctx,
 						       ossl_unused void *provctx)
 {
 	return uadk_prov_default_ctx_params;
