@@ -583,10 +583,8 @@ static int uadk_prov_hw_cipher(struct cipher_priv_ctx *priv, unsigned char *out,
 	struct async_op op;
 	int ret;
 
-	fprintf(stderr, "outsize=%zu, blksz=%zu, inlen=%zu\n", outsize, blksz, inlen);
 	if (outsize < blksz) {
 		ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-		fprintf(stderr, "ep0, outsize < blksz\n");fflush(stderr);
 		return 0;
 	}
 
@@ -601,14 +599,12 @@ static int uadk_prov_hw_cipher(struct cipher_priv_ctx *priv, unsigned char *out,
 	if (inlen <= blksz) {
 		/* small packet directly using sync? */
 		ret = uadk_do_cipher_sync(priv);
-		if (!ret) {
-			fprintf(stderr, "ep1, failed uadk_do_cipher_sync()\n");fflush(stderr);
+		if (!ret)
 			return 0;
-		}
 	} else {
 		ret = async_setup_async_event_notification(&op);
 		if (!ret) {
-			fprintf(stderr, "ep2, failed to setup async event notification.\n");fflush(stderr);
+			fprintf(stderr, "failed to setup async event notification.\n");
 			return 0;
 		}
 
@@ -617,14 +613,12 @@ static int uadk_prov_hw_cipher(struct cipher_priv_ctx *priv, unsigned char *out,
 			ret = uadk_do_cipher_sync(priv);
 			if (!ret) {
 				async_clear_async_event_notification();
-				fprintf(stderr, "ep3, failed uadk_do_cipher_sync()\n");fflush(stderr);
 				return 0;
 			}
 		} else {
 			ret = uadk_do_cipher_async(priv, &op);
 			if (!ret) {
 				async_clear_async_event_notification();
-				fprintf(stderr, "ep4, failed uadk_do_cipher_sync()\n");fflush(stderr);
 				return 0;
 			}
 		}
@@ -676,7 +670,7 @@ static int uadk_prov_do_cipher(struct cipher_priv_ctx *priv, unsigned char *out,
 	if (priv->bufsz == blksz && (priv->enc || inlen > 0 || !priv->pad)) {
 		ret = uadk_prov_hw_cipher(priv, out, outl, outsize, priv->buf, blksz);
 		if (ret != 1) {
-			fprintf(stderr, "%s(): Line %d: do hw ciphers failed.\n", __func__, __LINE__);
+			fprintf(stderr, "do hw ciphers failed.\n");
 			return ret;
 		}
 
@@ -694,7 +688,7 @@ static int uadk_prov_do_cipher(struct cipher_priv_ctx *priv, unsigned char *out,
 	if (nextblocks > 0) {
 		ret = uadk_prov_hw_cipher(priv, out, outl, outsize, in, nextblocks);
 		if (ret != 1) {
-			fprintf(stderr, "%s(): Line %d: do hw ciphers failed.\n", __func__, __LINE__);
+			fprintf(stderr, "do hw ciphers failed.\n");
 			return ret;
 		}
 
@@ -790,7 +784,7 @@ static int uadk_prov_cipher_block_final(void *vctx, unsigned char *out,
 
 		ret = uadk_prov_hw_cipher(priv, out, outl, outsize, priv->buf, blksz);
 		if (ret != 1) {
-			fprintf(stderr, "%s(): Line %d: do hw ciphers failed.\n", __func__, __LINE__);
+			fprintf(stderr, "do hw ciphers failed.\n");
 			return ret;
 		}
 		*outl = blksz;
@@ -809,7 +803,7 @@ static int uadk_prov_cipher_block_final(void *vctx, unsigned char *out,
 
 	ret = uadk_prov_hw_cipher(priv, priv->buf, outl, outsize, priv->buf, blksz);
 	if (ret != 1) {
-		fprintf(stderr, "%s(): Line %d: do hw ciphers failed.\n", __func__, __LINE__);
+		fprintf(stderr, "do hw ciphers failed.\n");
 		return ret;
 	}
 
@@ -888,10 +882,8 @@ static int uadk_prov_cipher_stream_update(void *vctx, unsigned char *out,
 	}
 
 	ret = uadk_prov_hw_cipher(priv, out, outl, outsize, in, inl);
-	if (ret != 1) {
-		fprintf(stderr, "%s(): Line %d: do hw ciphers failed.\n", __func__, __LINE__);
+	if (ret != 1)
 		return ret;
-	}
 
 	*outl = inl;
 	return 1;
