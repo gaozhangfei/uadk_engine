@@ -91,6 +91,127 @@ struct sm2_param {
 	BIGNUM *yA;
 };
 
+# if OPENSSL_VERSION_NUMBER >= 0x30000000
+
+#define OSSL_MAX_NAME_SIZE 50          /* Algorithm name */
+//# define OSSL_MAX_PROPQUERY_SIZE     256 /* Property query strings */
+# define OSSL_MAX_ALGORITHM_ID_SIZE  256 /* AlgorithmIdentifier DER */
+# define SM3_DIGEST_LENGTH 32
+# define SM2_DEFAULT_USERID "1234567812345678"
+# define SM2_DEFAULT_USERID_LEN sizeof(SM2_DEFAULT_USERID) - 1
+
+typedef struct {
+	/* Key and paramgen group */
+	EC_GROUP *gen_group;
+	/* message digest */
+	const EVP_MD *md;
+	/* Distinguishing Identifier, ISO/IEC 15946-3 */
+	uint8_t *id;
+	size_t id_len;
+	/* id_set indicates if the 'id' field is set (1) or not (0) */
+	int id_set;
+} UADK_SM2_PKEY_CTX;
+
+typedef struct evp_signature_st {
+    int name_id;
+    char *type_name;
+    const char *description;
+    OSSL_PROVIDER *prov;
+    int refcnt;
+# if OPENSSL_VERSION_NUMBER < 0x30200000
+    void *lock;
+# endif
+
+    OSSL_FUNC_signature_newctx_fn *newctx;
+    OSSL_FUNC_signature_sign_init_fn *sign_init;
+    OSSL_FUNC_signature_sign_fn *sign;
+    OSSL_FUNC_signature_verify_init_fn *verify_init;
+    OSSL_FUNC_signature_verify_fn *verify;
+    OSSL_FUNC_signature_verify_recover_init_fn *verify_recover_init;
+    OSSL_FUNC_signature_verify_recover_fn *verify_recover;
+    OSSL_FUNC_signature_digest_sign_init_fn *digest_sign_init;
+    OSSL_FUNC_signature_digest_sign_update_fn *digest_sign_update;
+    OSSL_FUNC_signature_digest_sign_final_fn *digest_sign_final;
+    OSSL_FUNC_signature_digest_sign_fn *digest_sign;
+    OSSL_FUNC_signature_digest_verify_init_fn *digest_verify_init;
+    OSSL_FUNC_signature_digest_verify_update_fn *digest_verify_update;
+    OSSL_FUNC_signature_digest_verify_final_fn *digest_verify_final;
+    OSSL_FUNC_signature_digest_verify_fn *digest_verify;
+    OSSL_FUNC_signature_freectx_fn *freectx;
+    OSSL_FUNC_signature_dupctx_fn *dupctx;
+    OSSL_FUNC_signature_get_ctx_params_fn *get_ctx_params;
+    OSSL_FUNC_signature_gettable_ctx_params_fn *gettable_ctx_params;
+    OSSL_FUNC_signature_set_ctx_params_fn *set_ctx_params;
+    OSSL_FUNC_signature_settable_ctx_params_fn *settable_ctx_params;
+    OSSL_FUNC_signature_get_ctx_md_params_fn *get_ctx_md_params;
+    OSSL_FUNC_signature_gettable_ctx_md_params_fn *gettable_ctx_md_params;
+    OSSL_FUNC_signature_set_ctx_md_params_fn *set_ctx_md_params;
+    OSSL_FUNC_signature_settable_ctx_md_params_fn *settable_ctx_md_params;
+} UADK_EVP_SIGNATURE /* EVP_SIGNATURE for UADK Provider sm2 */;
+
+typedef struct {
+    OSSL_LIB_CTX *libctx;
+    char *propq;
+    EC_KEY *ec;
+
+    /*
+     * Flag to termine if the 'z' digest needs to be computed and fed to the
+     * hash function.
+     * This flag should be set on initialization and the compuation should
+     * be performed only once, on first update.
+     */
+    unsigned int flag_compute_z_digest : 1;
+
+    char mdname[OSSL_MAX_NAME_SIZE];
+
+    /* The Algorithm Identifier of the combined signature algorithm */
+    unsigned char aid_buf[OSSL_MAX_ALGORITHM_ID_SIZE];
+    unsigned char *aid;
+    size_t  aid_len;
+
+    /* main digest */
+    EVP_MD *md;
+    EVP_MD_CTX *mdctx;
+    size_t mdsize;
+
+    /* SM2 ID used for calculating the Z value */
+    unsigned char *id;
+    size_t id_len;
+
+    const unsigned char *tbs;
+    size_t tbs_len;
+} UADK_PROV_SM2_CTX;
+
+struct bignum_st {
+    BN_ULONG *d;                /* Pointer to an array of 'BN_BITS2' bit
+                                 * chunks. */
+    int top;                    /* Index of last used d +1. */
+    /* The next are internal book keeping for bn_expand. */
+    int dmax;                   /* Size of the d array. */
+    int neg;                    /* one if the number is negative */
+    int flags;
+};
+
+static EVP_PKEY_METHOD *_hidden_sm2_pmeth = NULL;
+
+static UADK_EVP_SIGNATURE get_def_signature_sm2()
+{
+    static UADK_EVP_SIGNATURE s_signature;
+    static int initilazed = 0;
+    if (!initilazed) {
+        UADK_EVP_SIGNATURE *signature = (UADK_EVP_SIGNATURE *)EVP_SIGNATURE_fetch(NULL, "SM2", "provider=default");
+	if (signature) {
+            s_signature = *signature;
+            EVP_SIGNATURE_free((UADK_EVP_SIGNATURE *)signature);
+            initilazed = 1;
+        } else {
+            fprintf(stderr, "EVP_SIGNATURE_fetch from default provider failed");
+        }
+    }
+    return s_signature;
+}
+# endif
+
 DECLARE_ASN1_FUNCTIONS(SM2_Ciphertext)
 
 ASN1_SEQUENCE(SM2_Ciphertext) = {
@@ -328,6 +449,8 @@ static int openssl_encrypt(EVP_PKEY_CTX *ctx,
 	const EVP_PKEY_METHOD *openssl_meth;
 	PFUNC_DEC enc_pfunc = NULL;
 
+	printf("gzf %s\n", __func__);
+
 	openssl_meth = get_openssl_pkey_meth(EVP_PKEY_SM2);
 	if (!openssl_meth) {
 		fprintf(stderr, "failed to get sm2 pkey methods\n");
@@ -350,6 +473,7 @@ static int openssl_decrypt(EVP_PKEY_CTX *ctx,
 	const EVP_PKEY_METHOD *openssl_meth;
 	PFUNC_ENC dec_pfunc = NULL;
 
+	printf("gzf %s\n", __func__);
 	openssl_meth = get_openssl_pkey_meth(EVP_PKEY_SM2);
 	if (!openssl_meth) {
 		fprintf(stderr, "failed to get sm2 pkey methods\n");
@@ -1175,6 +1299,7 @@ static void sm2_cleanup(EVP_PKEY_CTX *ctx)
 {
 	struct sm2_ctx *smctx = EVP_PKEY_CTX_get_data(ctx);
 
+	printf("gzf %s\n", __func__);
 	if (!smctx)
 		return;
 
@@ -1194,12 +1319,13 @@ static int sm2_init(EVP_PKEY_CTX *ctx)
 	struct sm2_ctx *smctx;
 	int ret;
 
+	printf("gzf %s\n", __func__);
 	smctx = calloc(1, sizeof(*smctx));
 	if (!smctx) {
 		fprintf(stderr, "failed to alloc sm2 ctx\n");
 		return 0;
 	}
-
+/*
 	ret = uadk_e_ecc_get_support_state(SM2_SUPPORT);
 	if (!ret) {
 		fprintf(stderr, "sm2 is not supported\n");
@@ -1212,7 +1338,7 @@ static int sm2_init(EVP_PKEY_CTX *ctx)
 		smctx->init_status = CTX_INIT_FAIL;
 		goto end;
 	}
-
+*/
 	smctx->init_status = CTX_INIT_SUCC;
 end:
 	EVP_PKEY_CTX_set_data(ctx, smctx);
@@ -1251,11 +1377,14 @@ static int sm2_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 	EC_GROUP *group;
 	int md_nid;
 
+	printf("gzf %s\n", __func__);
+
 	if (!smctx) {
 		fprintf(stderr, "smctx not set.\n");
 		return 0;
 	}
 
+	printf("gzf %s type=%d\n", __func__, type);
 	switch (type) {
 	case EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID:
 		group = EC_GROUP_new_by_curve_name(p1);
@@ -1315,6 +1444,7 @@ set_data:
 		if (sm2_update_sess(smctx))
 			return 0;
 
+	printf("gzf %s success\n", __func__);
 	EVP_PKEY_CTX_set_data(ctx, smctx);
 	return 1;
 }
@@ -1322,6 +1452,7 @@ set_data:
 static int sm2_ctrl_str(EVP_PKEY_CTX *ctx,
 			const char *type, const char *value)
 {
+	printf("gzf %s\n", __func__);
 	if (strcmp(type, "ec_paramgen_curve") == 0) {
 		int nid;
 
@@ -1558,6 +1689,7 @@ static int sm2_compute_z_digest(uint8_t *out, const EVP_MD *digest,
 
 	ret = 1;
 
+printf("gzf %s done\n", __func__);
 free_buf:
 	OPENSSL_free(buf);
 free_param:
@@ -1612,7 +1744,7 @@ static int sm2_copy(EVP_PKEY_CTX *dst, const EVP_PKEY_CTX *src)
 # endif
 {
 	struct sm2_ctx *dctx, *sctx;
-
+printf("gzf %s\n", __func__);
 	if (!sm2_init(dst))
 		return 0;
 	sctx = EVP_PKEY_CTX_get_data(src);
@@ -1639,14 +1771,355 @@ static int sm2_copy(EVP_PKEY_CTX *dst, const EVP_PKEY_CTX *src)
 	dctx->ctx.id_set = sctx->ctx.id_set;
 	dctx->ctx.md = sctx->ctx.md;
 
+	printf("gzf %s done\n", __func__);
 	return 1;
 }
 
-int uadk_sm2_create_pmeth(struct uadk_pkey_meth *pkey_meth)
+# if OPENSSL_VERSION_NUMBER >= 0x30000000
+static int mb_sm2_init(EVP_PKEY_CTX *ctx)
+{
+	UADK_SM2_PKEY_CTX *smctx = NULL;
+	printf("gzf %s\n", __func__);
+
+	if (unlikely(ctx == NULL)) {
+		fprintf(stderr, "ctx (type EVP_PKEY_CTX) is NULL\n");
+		return 0;
+	}
+
+	if ((smctx = OPENSSL_zalloc(sizeof(*smctx))) == NULL) {
+		fprintf(stderr, "smctx alloc Failure\n");
+		return 0;
+	}
+
+	EVP_PKEY_CTX_set_data(ctx, smctx);
+	return 1;
+}
+
+static void mb_sm2_cleanup(EVP_PKEY_CTX *ctx)
+{
+	UADK_SM2_PKEY_CTX *smctx = NULL;
+
+	printf("gzf %s\n", __func__);
+	if (unlikely(ctx == NULL)) {
+		fprintf(stderr, "ctx (type EVP_PKEY_CTX) is NULL\n");
+		return;
+	}
+
+	smctx = (UADK_SM2_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+	if (smctx == NULL) {
+		fprintf(stderr, "smctx is NULL\n");
+		return;
+	}
+
+	EC_GROUP_free(smctx->gen_group);
+	OPENSSL_free(smctx->id);
+	OPENSSL_free(smctx);
+}
+
+static int pkey_ec_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
 	const EVP_PKEY_METHOD *openssl_meth;
+	int (*pkeygen) (EVP_PKEY_CTX *ctx, EVP_PKEY *pkey) = NULL;
+
+	printf("gzf %s\n", __func__);
+	if ((openssl_meth = EVP_PKEY_meth_find(EVP_PKEY_EC)) == NULL) {
+		fprintf(stderr, "failed to find EVP_PKEY_EC\n");
+		return -1;
+	}
+	printf("gzf %s openssl_meth=%p\n", __func__, openssl_meth);
+
+	EVP_PKEY_meth_get_keygen((EVP_PKEY_METHOD *)openssl_meth, NULL, &pkeygen);
+	printf("1\n");
+	pkeygen(ctx, pkey);
+	*(int *)pkey = EVP_PKEY_SM2;
+	printf("gzf %s done\n", __func__);
+	return 1;
+}
+
+int qat_hw_sm2_compute_z_digest(uint8_t *out,
+                             const EVP_MD *digest,
+                             const uint8_t *id,
+                             const size_t id_len, const EC_KEY *key)
+{
+    int rc = 0;
+    const EC_GROUP *group = EC_KEY_get0_group(key);
+    BN_CTX *ctx = NULL;
+    EVP_MD_CTX *hash = NULL;
+    BIGNUM *p = NULL;
+    BIGNUM *a = NULL;
+    BIGNUM *b = NULL;
+    BIGNUM *xG = NULL;
+    BIGNUM *yG = NULL;
+    BIGNUM *xA = NULL;
+    BIGNUM *yA = NULL;
+    int p_bytes = 0;
+    uint8_t *buf = NULL;
+    uint16_t entl = 0;
+    uint8_t e_byte = 0;
+
+    hash = EVP_MD_CTX_new();
+    ctx = BN_CTX_new();
+    if (hash == NULL || ctx == NULL) {
+        fprintf(stderr, "%s BN_CTX_new fail\n", __func__);
+        goto done;
+    }
+
+    p = BN_CTX_get(ctx);
+    a = BN_CTX_get(ctx);
+    b = BN_CTX_get(ctx);
+    xG = BN_CTX_get(ctx);
+    yG = BN_CTX_get(ctx);
+    xA = BN_CTX_get(ctx);
+    yA = BN_CTX_get(ctx);
+
+    if (yA == NULL) {
+        fprintf(stderr, "%s BN_CTX_get fail\n", __func__);
+        goto done;
+    }
+
+    if (!EVP_DigestInit(hash, digest)) {
+        fprintf(stderr, "%s BN_CTX_get fail\n", __func__);
+        goto done;
+    }
+
+    /* Z = h(ENTL || ID || a || b || xG || yG || xA || yA) */
+
+    if (id_len >= (UINT16_MAX / 8)) {
+        /* too large */
+        fprintf(stderr, "%s sm2 id too large\n", __func__);
+        goto done;
+    }
+
+    entl = (uint16_t)(8 * id_len);
+
+    e_byte = entl >> 8;
+    if (!EVP_DigestUpdate(hash, &e_byte, 1)) {
+        fprintf(stderr, "%s DigestUpdate fail\n", __func__);
+        goto done;
+    }
+    e_byte = entl & 0xFF;
+    if (!EVP_DigestUpdate(hash, &e_byte, 1)) {
+        fprintf(stderr, "%s DigestUpdate fail\n", __func__);
+        goto done;
+    }
+
+    if (id_len > 0 && !EVP_DigestUpdate(hash, id, id_len)) {
+        fprintf(stderr, "%s DigestUpdate fail\n", __func__);
+        goto done;
+    }
+
+    if (!EC_GROUP_get_curve(group, p, a, b, ctx)) {
+        fprintf(stderr, "%s get_curve fail\n", __func__);
+        goto done;
+    }
+
+    p_bytes = BN_num_bytes(p);
+    buf = OPENSSL_zalloc(p_bytes);
+    if (buf == NULL) {
+        fprintf(stderr, "%s malloc fail\n", __func__);
+        goto done;
+    }
+
+    if (BN_bn2binpad(a, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || BN_bn2binpad(b, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || !EC_POINT_get_affine_coordinates(group,
+                                            EC_GROUP_get0_generator(group),
+                                            xG, yG, ctx)
+        || BN_bn2binpad(xG, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || BN_bn2binpad(yG, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || !EC_POINT_get_affine_coordinates(group,
+                                            EC_KEY_get0_public_key(key),
+                                            xA, yA, ctx)
+        || BN_bn2binpad(xA, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || BN_bn2binpad(yA, buf, p_bytes) < 0
+        || !EVP_DigestUpdate(hash, buf, p_bytes)
+        || !EVP_DigestFinal(hash, out, NULL)) {
+        fprintf(stderr, "%s internal error\n", __func__);
+        goto done;
+    }
+
+    rc = 1;
+printf("gzf %s done\n", __func__);
+ done:
+    OPENSSL_free(buf);
+    BN_CTX_free(ctx);
+    EVP_MD_CTX_free(hash);
+    return rc;
+}
+static BIGNUM *sm2_compute_msg_hash(const EVP_MD *digest,
+                                    const EC_KEY *key,
+                                    const uint8_t *id,
+                                    const size_t id_len,
+                                    const uint8_t *msg, size_t msg_len)
+{
+    EVP_MD_CTX *hash = EVP_MD_CTX_new();
+    const int md_size = EVP_MD_size(digest);
+    uint8_t *z = NULL;
+    BIGNUM *e = NULL;
+
+    if (md_size < 0) {
+        fprintf(stderr, "%s md_size error\n", __func__);
+        goto done;
+    }
+
+    z = OPENSSL_zalloc(md_size);
+    if (hash == NULL || z == NULL) {
+        fprintf(stderr, "%s zalloc error\n", __func__);
+        goto done;
+    }
+
+    if (!qat_hw_sm2_compute_z_digest(z, digest, id, id_len, key)) {
+        /* SM2err already called */
+        goto done;
+    }
+
+    if (!EVP_DigestInit(hash, digest)
+        || !EVP_DigestUpdate(hash, z, md_size)
+        || !EVP_DigestUpdate(hash, msg, msg_len)
+        /* reuse z buffer to hold H(Z || M) */
+        || !EVP_DigestFinal(hash, z, NULL)) {
+        fprintf(stderr, "%s hash error\n", __func__);
+        goto done;
+    }
+
+    e = BN_bin2bn(z, md_size, NULL);
+    if (e == NULL)
+        fprintf(stderr, "%s hash error\n", __func__);
+
+printf("gzf %s done\n", __func__);
+ done:
+    OPENSSL_free(z);
+    EVP_MD_CTX_free(hash);
+    return e;
+}
+static int openssl3_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
+			    const unsigned char *tbs, size_t tbslen)
+{
+    UADK_EVP_SIGNATURE sw_sm2_signature;
+    int sig_sz;
+    unsigned char *dgst = NULL;
+    BIGNUM *bg = NULL;
+    EVP_MD *md = NULL;
+    int dlen = 0;
+    UADK_PROV_SM2_CTX *sw_ctx;
+    EVP_PKEY *pkey = EVP_PKEY_CTX_get0_pkey(ctx);
+    printf("gzf pkey=%p\n", pkey);
+    const EC_KEY *eckey = EVP_PKEY_get0_EC_KEY(pkey);
+    printf("gzf eckey=%p\n", eckey);
+    int ret = 0;
+
+    UADK_SM2_PKEY_CTX *smctx = (UADK_SM2_PKEY_CTX *) EVP_PKEY_CTX_get_data(ctx);
+    if (!smctx->id_set) {
+        smctx->id_set = 1;
+        smctx->id =
+            (uint8_t *)OPENSSL_memdup(SM2_DEFAULT_USERID,
+                                      SM2_DEFAULT_USERID_LEN);
+        smctx->id_len = SM2_DEFAULT_USERID_LEN;
+    }
+    sw_sm2_signature = get_def_signature_sm2();
+
+    sig_sz = ECDSA_size(eckey);
+    printf("gzf sig_sz=%d\n", sig_sz);
+	if (sig_sz <= 0)
+		return ret;
+        /* When using OpenSSL 3 legacy engine API */
+        sw_ctx = OPENSSL_malloc(sizeof(UADK_PROV_SM2_CTX));
+        sw_ctx->mdsize = 0;
+        sw_ctx->ec = (EC_KEY *)eckey;
+  	md = (EVP_MD *)EVP_sm3();
+        bg = sm2_compute_msg_hash(md, eckey, smctx->id, smctx->id_len, tbs,
+                                  tbslen);
+        dgst = OPENSSL_zalloc(SM3_DIGEST_LENGTH);
+        dlen = BN_bn2bin(bg, dgst);
+        if (sw_sm2_signature.sign) {
+            ret = sw_sm2_signature.sign(sw_ctx, sig, siglen, sig_sz, dgst, dlen);
+        } else {
+            fprintf(stderr, "Failed to obtain sm2 sign func from default provider.\n");
+            ret = 0;
+        }
+        OPENSSL_free(dgst);
+        BN_free(bg);
+        OPENSSL_free(sw_ctx);
+
+        return ret;
+}
+
+static int openssl3_verify(EVP_PKEY_CTX *ctx,
+			  const unsigned char *sig, size_t siglen,
+			  const unsigned char *tbs, size_t tbslen)
+{
+	UADK_EVP_SIGNATURE sw_sm2_signature;
+	UADK_PROV_SM2_CTX *sw_ctx;
+	EVP_PKEY *pkey = EVP_PKEY_CTX_get0_pkey(ctx);
+	const EC_KEY *eckey = EVP_PKEY_get0_EC_KEY(pkey);
+	int ret = 0;
+	unsigned char *msdgst = NULL;
+	BIGNUM *bg = NULL;
+	EVP_MD *md = NULL;
+	int mdlen = 0;
+    UADK_SM2_PKEY_CTX *smctx = (UADK_SM2_PKEY_CTX *) EVP_PKEY_CTX_get_data(ctx);
+    if (!smctx->id_set) {
+        smctx->id_set = 1;
+        smctx->id =
+            (uint8_t *)OPENSSL_memdup(SM2_DEFAULT_USERID,
+                                      SM2_DEFAULT_USERID_LEN);
+        smctx->id_len = SM2_DEFAULT_USERID_LEN;
+    }
+#if 1
+	/* When using OpenSSL 3 legacy engine API */
+	sw_ctx = OPENSSL_malloc(sizeof(UADK_PROV_SM2_CTX));
+	sw_ctx->mdsize = 0;
+	sw_ctx->ec = (EC_KEY *)eckey;
+	md = (EVP_MD *)EVP_sm3();
+	bg = sm2_compute_msg_hash(md, eckey, smctx->id, smctx->id_len, tbs,
+				  tbslen);
+	msdgst = OPENSSL_zalloc(SM3_DIGEST_LENGTH);
+	mdlen = BN_bn2bin(bg, msdgst);
+
+	sw_sm2_signature = get_def_signature_sm2();
+	if (sw_sm2_signature.verify) {
+		ret = sw_sm2_signature.verify(sw_ctx, sig, siglen, msdgst, mdlen);
+	} else {
+		fprintf(stderr, "Failed to obtain sm2 verify func from default provider.\n");
+		ret = 0;
+	}
+	OPENSSL_free(msdgst);
+	BN_free(bg);
+	OPENSSL_free(sw_ctx);
+	return ret;
+#else
+
+    /* When using OpenSSL 3 provider API */
+    sw_sm2_signature = get_def_signature_sm2();
+    if (sw_sm2_signature.digest_verify) {
+	    printf("gzf call digest_verify\n");
+        return sw_sm2_signature.digest_verify((void*)smctx, sig, siglen, tbs, tbslen);
+    } else {
+	    printf("call digest_update and final\n");
+        if (sw_sm2_signature.digest_verify_update == NULL ||
+                sw_sm2_signature.digest_verify_final == NULL) {
+            return -1;
+        }
+        if (sw_sm2_signature.digest_verify_update((void*)smctx, tbs, tbslen) <= 0) {
+            return -1;
+        }
+        return sw_sm2_signature.digest_verify_final((void*)smctx, sig, siglen);
+    }
+
+#endif
+}
+# endif
+
+int uadk_sm2_create_pmeth(struct uadk_pkey_meth *pkey_meth)
+{
 	EVP_PKEY_METHOD *meth;
 
+	printf("gzf %s\n", __func__);
 	if (pkey_meth->sm2)
 		return 1;
 
@@ -1655,6 +2128,10 @@ int uadk_sm2_create_pmeth(struct uadk_pkey_meth *pkey_meth)
 		fprintf(stderr, "failed to EVP_PKEY_meth_new\n");
 		return 0;
 	}
+	pkey_meth->sm2 = meth;
+
+#if OPENSSL_VERSION_NUMBER < 0x30000000
+	const EVP_PKEY_METHOD *openssl_meth;
 
 	openssl_meth = get_openssl_pkey_meth(EVP_PKEY_SM2);
 	if (!openssl_meth) {
@@ -1664,11 +2141,35 @@ int uadk_sm2_create_pmeth(struct uadk_pkey_meth *pkey_meth)
 	}
 
 	EVP_PKEY_meth_copy(meth, openssl_meth);
-
-	if (!uadk_e_ecc_get_support_state(SM2_SUPPORT)) {
-		pkey_meth->sm2 = meth;
-		return 1;
+# else
+	/* OpenSSL 3.0 */
+	if (_hidden_sm2_pmeth == NULL) {
+		if ((_hidden_sm2_pmeth = EVP_PKEY_meth_new(EVP_PKEY_SM2, 0)) == NULL) {
+			fprintf(stderr, "failed to EVP_PKEY_meth_new\n");
+			return -1;
+		}
 	}
+	// how many func has to be set
+	EVP_PKEY_meth_set_init(_hidden_sm2_pmeth, mb_sm2_init);
+	EVP_PKEY_meth_set_cleanup(_hidden_sm2_pmeth, mb_sm2_cleanup);
+	// do we have to set keygen?
+        EVP_PKEY_meth_set_keygen(_hidden_sm2_pmeth, NULL, pkey_ec_keygen);
+        //EVP_PKEY_meth_set_keygen(meth, NULL, pkey_ec_keygen);
+        
+	EVP_PKEY_meth_set_sign(_hidden_sm2_pmeth, NULL, openssl3_sign);
+        EVP_PKEY_meth_set_verify(_hidden_sm2_pmeth, NULL, openssl3_verify);
+        EVP_PKEY_meth_set_encrypt(_hidden_sm2_pmeth, NULL, openssl_encrypt);
+        EVP_PKEY_meth_set_decrypt(_hidden_sm2_pmeth, NULL, openssl_decrypt);
+	printf("gzf %s _hidden_sm2_pmeth=%p\n", __func__, _hidden_sm2_pmeth);
+	
+	EVP_PKEY_meth_set_ctrl(_hidden_sm2_pmeth, sm2_ctrl, sm2_ctrl_str);
+	EVP_PKEY_meth_set_copy(_hidden_sm2_pmeth, sm2_copy);
+	pkey_meth->sm2 = _hidden_sm2_pmeth;
+	return 1;
+# endif
+
+	if (!uadk_e_ecc_get_support_state(SM2_SUPPORT))
+		return 1;
 
 	EVP_PKEY_meth_set_init(meth, sm2_init);
 	EVP_PKEY_meth_set_copy(meth, sm2_copy);
@@ -1679,7 +2180,6 @@ int uadk_sm2_create_pmeth(struct uadk_pkey_meth *pkey_meth)
 	EVP_PKEY_meth_set_decrypt(meth, sm2_decrypt_init, sm2_decrypt);
 	EVP_PKEY_meth_set_sign(meth, sm2_sign_init, sm2_sign);
 	EVP_PKEY_meth_set_verify(meth, sm2_verify_init, sm2_verify);
-	pkey_meth->sm2 = meth;
 
 	return 1;
 }
@@ -1691,4 +2191,9 @@ void uadk_sm2_delete_pmeth(struct uadk_pkey_meth *pkey_meth)
 
 	EVP_PKEY_meth_free(pkey_meth->sm2);
 	pkey_meth->sm2 = NULL;
+
+# if OPENSSL_VERSION_NUMBER >= 0x30000000
+        if (_hidden_sm2_pmeth)
+		EVP_PKEY_meth_free(_hidden_sm2_pmeth);
+# endif
 }

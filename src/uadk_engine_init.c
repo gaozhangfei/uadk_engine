@@ -376,15 +376,16 @@ static void bind_fn_uadk_alg(ENGINE *e)
 		free(dev);
 	}
 
+	printf("gzf %s\n", __func__);
 	/* find an ecc device, no difference for sm2/ecdsa/ecdh/x25519/x448 */
-	dev = wd_get_accel_dev("ecdsa");
-	if (dev) {
+//	dev = wd_get_accel_dev("ecdsa");
+//	if (dev) {
 		if (!uadk_e_bind_ecc(e))
 			fprintf(stderr, "uadk bind ecc failed\n");
 		else
 			uadk_ecc = 1;
-		free(dev);
-	}
+//		free(dev);
+//	}
 }
 
 /*

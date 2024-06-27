@@ -158,14 +158,16 @@ int uadk_e_ecc_get_numa_id(void)
 
 int uadk_e_ecc_get_support_state(int alg_tag)
 {
+	printf("gzf %s alg_tag=%d\n", __func__, alg_tag);
+	return 1;
 	return g_ecc_support_state[alg_tag];
 }
-
+/*
 static void uadk_e_ecc_set_support_state(int alg_tag, int value)
 {
 	g_ecc_support_state[alg_tag] = value;
 }
-
+*/
 static int uadk_e_ecc_env_poll(void *ctx)
 {
 	__u64 rx_cnt = 0;
@@ -623,9 +625,12 @@ const EVP_PKEY_METHOD *get_openssl_pkey_meth(int nid)
 	int pkey_id = -1;
 	size_t i;
 
+	printf("gzf %s count=%ld\n", __func__, count);
 	for (i = 0; i < count; i++) {
 		pmeth = EVP_PKEY_meth_get0(i);
+		printf("pmeth=%p\n", pmeth);
 		EVP_PKEY_meth_get0_info(&pkey_id, NULL, pmeth);
+		printf("nid=%d, pkey_id=%d\n", nid, pkey_id);
 		if (nid == pkey_id)
 			return pmeth;
 	}
@@ -639,6 +644,7 @@ static int get_pkey_meths(ENGINE *e, EVP_PKEY_METHOD **pmeth,
 {
 	int ret;
 
+	printf("gzf %s nid=%d\n", __func__, nid);
 	if (!pmeth) {
 		*nids = pkey_nids;
 		return ARRAY_SIZE(pkey_nids);
@@ -703,18 +709,23 @@ void uadk_e_ecc_lock_init(void)
 
 int uadk_e_bind_ecc(ENGINE *e)
 {
+	int ret;
+	#if 0
 	static const char * const ecc_alg[] = {"sm2", "ecdsa", "ecdh", "x25519", "x448"};
 	__u32 i, size;
 	int ret;
 	bool sp;
 
+	printf("gzf %s\n", __func__);
 	/* Enumerate ecc algs to check whether it is supported and set tags */
 	size = ARRAY_SIZE(ecc_alg);
+	
 	for (i = 0; i < size; i++) {
 		sp = uadk_support_algorithm(*(ecc_alg + i));
 		if (sp)
 			uadk_e_ecc_set_support_state(i, SUPPORT);
 	}
+	#endif
 
 	ret = uadk_ecc_bind_pmeth(e);
 	if (!ret) {
